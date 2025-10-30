@@ -6,7 +6,7 @@ let editingId = null;
 let useSupabase = false; // Supabase 사용 여부
 let isAdmin = false; // 관리자 여부
 const ADMIN_EMAILS = [
-    'your-email@gmail.com'  // TODO: 본인 이메일로 변경
+    'miyaza@gmail.com'
 ]; // 관리자 이메일 목록
 
 // Initialize on page load
