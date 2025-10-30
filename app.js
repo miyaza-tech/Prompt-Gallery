@@ -11,15 +11,19 @@ const ADMIN_EMAILS = [
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', async function() {
+    console.log('App initializing...');
+    console.log('Supabase available:', typeof supabase !== 'undefined');
+    console.log('SUPABASE_URL:', typeof SUPABASE_URL !== 'undefined' ? SUPABASE_URL : 'undefined');
+    
     // Supabase 연결 확인
     try {
-        if (typeof supabase !== 'undefined' && SUPABASE_URL !== 'YOUR_SUPABASE_URL') {
+        if (typeof supabase !== 'undefined' && typeof SUPABASE_URL !== 'undefined' && SUPABASE_URL !== 'YOUR_SUPABASE_URL') {
             useSupabase = true;
-            console.log('Supabase mode enabled');
+            console.log('✓ Supabase mode enabled');
             
             // Auth 상태 변경 리스너
             supabase.auth.onAuthStateChange(async (event, session) => {
-                console.log('Auth state changed:', event);
+                console.log('Auth state changed:', event, session ? 'User: ' + session.user.email : 'No user');
                 if (event === 'SIGNED_IN') {
                     await checkAdminStatus();
                     updateUIForAdminMode();
@@ -36,7 +40,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             
             await loadItemsFromSupabase();
         } else {
-            console.log('localStorage mode enabled');
+            console.log('✓ localStorage mode enabled (Supabase not configured)');
             loadItems();
         }
     } catch (error) {
@@ -47,6 +51,8 @@ document.addEventListener('DOMContentLoaded', async function() {
     renderGallery();
     updateButtonVisibility();
     updateUIForAdminMode();
+    
+    console.log('App initialized. useSupabase:', useSupabase, 'isAdmin:', isAdmin);
 });
 
 // Admin authentication
@@ -69,7 +75,12 @@ async function checkAdminStatus() {
 
 // Show login modal
 function showLoginModal() {
+    console.log('showLoginModal called');
     const modal = document.getElementById('loginModal');
+    if (!modal) {
+        console.error('Login modal not found!');
+        return;
+    }
     modal.classList.remove('hidden');
     modal.classList.add('flex');
 }
@@ -86,9 +97,13 @@ function closeLoginModal() {
 
 // Login with email and password
 async function loginAdmin() {
+    console.log('loginAdmin called');
     const email = document.getElementById('loginEmail').value;
     const password = document.getElementById('loginPassword').value;
     const errorEl = document.getElementById('loginError');
+    
+    console.log('Email:', email);
+    console.log('Supabase available:', typeof supabase !== 'undefined');
     
     if (!email || !password) {
         errorEl.textContent = 'Please enter both email and password';
@@ -97,13 +112,15 @@ async function loginAdmin() {
     }
     
     try {
-        const { error } = await supabase.auth.signInWithPassword({
+        console.log('Attempting login...');
+        const { data, error } = await supabase.auth.signInWithPassword({
             email: email,
             password: password
         });
         
         if (error) throw error;
         
+        console.log('Login successful:', data);
         closeLoginModal();
     } catch (error) {
         console.error('Login error:', error);
