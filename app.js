@@ -4,6 +4,10 @@ let currentFilter = 'All';
 let uploadType = 'url';
 let editingId = null;
 let useSupabase = false; // Supabase 사용 여부
+let isAdmin = false; // 관리자 여부
+const ADMIN_EMAILS = [
+    'your-email@gmail.com'  // TODO: 본인 이메일로 변경
+]; // 관리자 이메일 목록
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', async function() {
@@ -12,6 +16,24 @@ document.addEventListener('DOMContentLoaded', async function() {
         if (typeof supabase !== 'undefined' && SUPABASE_URL !== 'YOUR_SUPABASE_URL') {
             useSupabase = true;
             console.log('Supabase mode enabled');
+            
+            // Auth 상태 변경 리스너
+            supabase.auth.onAuthStateChange(async (event, session) => {
+                console.log('Auth state changed:', event);
+                if (event === 'SIGNED_IN') {
+                    await checkAdminStatus();
+                    updateUIForAdminMode();
+                    renderGallery();
+                } else if (event === 'SIGNED_OUT') {
+                    isAdmin = false;
+                    updateUIForAdminMode();
+                    renderGallery();
+                }
+            });
+            
+            // 관리자 확인
+            await checkAdminStatus();
+            
             await loadItemsFromSupabase();
         } else {
             console.log('localStorage mode enabled');
@@ -24,7 +46,91 @@ document.addEventListener('DOMContentLoaded', async function() {
     
     renderGallery();
     updateButtonVisibility();
+    updateUIForAdminMode();
 });
+
+// Admin authentication
+async function checkAdminStatus() {
+    try {
+        const { data: { user } } = await supabase.auth.getUser();
+        
+        if (user && ADMIN_EMAILS.includes(user.email)) {
+            isAdmin = true;
+            console.log('Admin authenticated:', user.email);
+        } else {
+            isAdmin = false;
+            console.log('Read-only mode');
+        }
+    } catch (error) {
+        console.error('Error checking admin status:', error);
+        isAdmin = false;
+    }
+}
+
+async function loginAsAdmin() {
+    try {
+        const { error } = await supabase.auth.signInWithOAuth({
+            provider: 'google',
+            options: {
+                redirectTo: window.location.origin
+            }
+        });
+        
+        if (error) throw error;
+    } catch (error) {
+        console.error('Login error:', error);
+        alert('Login failed: ' + error.message);
+    }
+}
+
+async function logoutAdmin() {
+    try {
+        await supabase.auth.signOut();
+        isAdmin = false;
+        updateUIForAdminMode();
+        alert('Logged out successfully');
+    } catch (error) {
+        console.error('Logout error:', error);
+    }
+}
+
+function updateUIForAdminMode() {
+    const newItemBtn = document.getElementById('addBtnText');
+    const addFormContainer = document.getElementById('addForm');
+    
+    if (useSupabase && !isAdmin) {
+        // 읽기 전용 모드 - 버튼 숨기기
+        if (newItemBtn && newItemBtn.parentElement) {
+            newItemBtn.parentElement.style.display = 'none';
+        }
+        if (addFormContainer) {
+            addFormContainer.style.display = 'none';
+        }
+        
+        // 로그인 버튼 추가
+        const header = document.querySelector('.flex.flex-col.md\\:flex-row');
+        if (header && !document.getElementById('adminLoginBtn')) {
+            const loginBtn = document.createElement('button');
+            loginBtn.id = 'adminLoginBtn';
+            loginBtn.onclick = loginAsAdmin;
+            loginBtn.className = 'border border-gray-300 text-gray-700 px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-50 transition-all';
+            loginBtn.textContent = 'Admin Login';
+            header.querySelector('.flex.flex-wrap').appendChild(loginBtn);
+        }
+    } else if (useSupabase && isAdmin) {
+        // 관리자 모드 - 버튼 보이기
+        if (newItemBtn && newItemBtn.parentElement) {
+            newItemBtn.parentElement.style.display = 'inline-block';
+        }
+        
+        // 로그아웃 버튼으로 변경
+        const loginBtn = document.getElementById('adminLoginBtn');
+        if (loginBtn) {
+            loginBtn.textContent = 'Admin Logout';
+            loginBtn.onclick = logoutAdmin;
+        }
+    }
+}
 
 // Supabase functions
 async function loadItemsFromSupabase() {
@@ -717,6 +823,13 @@ function createItemCard(item) {
           '_serf</button>'
         : '';
     
+    // Edit button only for admin in Supabase mode
+    const editButton = (!useSupabase || isAdmin)
+        ? '<button onclick=\"editItem(' + item.id + ')\" ' +
+          'class=\"bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-medium opacity-0 group-hover:opacity-100 transition-all transform translate-y-2 group-hover:translate-y-0 hover:bg-gray-800\">' +
+          'edit</button>'
+        : '';
+    
     return '<div class=\"bg-white rounded-xl shadow-lg overflow-hidden group relative hover:shadow-xl transition-all\">' +
         '<div class=\"aspect-square relative\">' +
         imageHtml +
@@ -725,9 +838,7 @@ function createItemCard(item) {
         '<button onclick=\"copyPrompt(\'' + jsEscapedPrompt + '\')\" ' +
         'class=\"bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-medium opacity-0 group-hover:opacity-100 transition-all transform translate-y-2 group-hover:translate-y-0 hover:bg-gray-800\">' +
         'prompt</button>' +
-        '<button onclick=\"editItem(' + item.id + ')\" ' +
-        'class=\"bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-medium opacity-0 group-hover:opacity-100 transition-all transform translate-y-2 group-hover:translate-y-0 hover:bg-gray-800\">' +
-        'edit</button>' +
+        editButton +
         '</div>' +
         '</div>' +
         '</div>';
