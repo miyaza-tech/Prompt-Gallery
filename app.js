@@ -6,7 +6,7 @@ let editingId = null;
 let useSupabase = false; // Supabase 사용 여부
 let isAdmin = false; // 관리자 여부
 const ADMIN_EMAILS = [
-    'miyaza@gmail.com'
+    'miyaza@naver.com'
 ]; // 관리자 이메일 목록
 
 // Initialize on page load
