@@ -1,0 +1,42 @@
+Prompt Gallery 애플리케이션의 사용 지침을 알려드리겠습니다:
+
+📝 Prompt Gallery 사용 가이드
+
+기본 기능
+
+1. 새 프롬프트 추가
+   • 상단의 "New Item" 버튼 클릭
+   • 이미지 추가 (선택사항):
+     - URL 방식: 이미지 링크 직접 입력
+     - File Upload: 로컬 이미지 파일 업로드 (최대 5MB)
+   • 카테고리 선택: Nano, GPT, Midjourney, Video, Photorealistic, Casual, Anime
+   • 프롬프트 내용 입력 (최대 1000자)
+   • _serf 코드 입력 (선택사항)
+   • "Add Prompt" 버튼으로 저장
+
+2. 프롬프트 관리
+   • 카드에 마우스 오버 시 _serf code, Copy Prompt, Edit 버튼 표시
+   • _serf code: _serf 코드를 복사 (표시방법 예: --sref 2869248224 버튼)
+   • Copy Prompt: 프롬프트 텍스트를 클립보드에 복사
+   • Edit: 기존 프롬프트 수정
+
+3. 필터링
+   • 상단 필터 바에서 카테고리별로 프롬프트 필터링
+   • "All" 버튼으로 전체 보기
+
+4. 데이터 관리
+   • Export: JSON 파일로 백업
+   • Import: 이전에 백업한 JSON 파일 불러오기
+
+데이터 저장
+• 모든 데이터는 브라우저의 localStorage에 자동 저장
+• 서버 없이 완전히 클라이언트 측에서 작동
+• 정기적으로 Export 기능으로 백업 권장
+• 저장 용량 제한: 브라우저당 약 5-10MB
+
+주요 특징
+✅ 완전한 오프라인 작동
+✅ 이미지 지원 (URL 또는 Base64)
+✅ 실시간 문자 수 카운터
+✅ 반응형 그리드 레이아웃 (최대 해상도에서 4개)
+✅ JSON 내보내기/가져오기

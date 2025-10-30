@@ -1,0 +1,23 @@
+C:\Users\user\Downloads\prompt-gallery/
+├── src/
+│   ├── components/
+│   │   ├── Header.jsx          ✅ 헤더 + 가져오기/내보내기/전체삭제
+│   │   ├── FilterBar.jsx       ✅ 카테고리 필터
+│   │   ├── PromptForm.jsx      ✅ 추가 폼 (유효성 검사 포함)
+│   │   ├── PromptCard.jsx      ✅ 개별 카드
+│   │   └── EmptyState.jsx      ✅ 빈 상태 UI
+│   ├── hooks/
+│   │   ├── usePromptItems.js   ✅ localStorage 자동 동기화
+│   │   └── useCopyToClipboard.js ✅ 2초 타이머 복사 피드백
+│   ├── utils/
+│   │   ├── storage.js          ✅ localStorage + JSON import/export
+│   │   └── constants.js        ✅ 카테고리/업로드 타입 상수
+│   ├── App.jsx                 ✅ 메인 컴포넌트
+│   ├── main.jsx                ✅ 진입점
+│   └── index.css               ✅ Tailwind + 커스텀 스타일
+├── package.json
+├── vite.config.js
+├── tailwind.config.js
+├── postcss.config.js
+├── .gitignore
+└── README.md
