@@ -25,6 +25,12 @@ document.addEventListener('DOMContentLoaded', async function() {
             supabase.auth.onAuthStateChange(async (event, session) => {
                 console.log('Auth state changed:', event, session ? 'User: ' + session.user.email : 'No user');
                 if (event === 'SIGNED_IN') {
+                    // 로그인 모달 닫기
+                    const modal = document.getElementById('loginModal');
+                    if (modal && !modal.classList.contains('hidden')) {
+                        closeLoginModal();
+                    }
+                    
                     await checkAdminStatus();
                     updateUIForAdminMode();
                     renderGallery();
