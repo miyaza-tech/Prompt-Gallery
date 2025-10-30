@@ -67,11 +67,34 @@ async function checkAdminStatus() {
     }
 }
 
-async function loginAsAdmin() {
-    const email = prompt('Enter admin email:');
-    const password = prompt('Enter password:');
+// Show login modal
+function showLoginModal() {
+    const modal = document.getElementById('loginModal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+
+// Close login modal
+function closeLoginModal() {
+    const modal = document.getElementById('loginModal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+    document.getElementById('loginEmail').value = '';
+    document.getElementById('loginPassword').value = '';
+    document.getElementById('loginError').classList.add('hidden');
+}
+
+// Login with email and password
+async function loginAdmin() {
+    const email = document.getElementById('loginEmail').value;
+    const password = document.getElementById('loginPassword').value;
+    const errorEl = document.getElementById('loginError');
     
-    if (!email || !password) return;
+    if (!email || !password) {
+        errorEl.textContent = 'Please enter both email and password';
+        errorEl.classList.remove('hidden');
+        return;
+    }
     
     try {
         const { error } = await supabase.auth.signInWithPassword({
@@ -81,11 +104,17 @@ async function loginAsAdmin() {
         
         if (error) throw error;
         
-        alert('Login successful!');
+        closeLoginModal();
     } catch (error) {
         console.error('Login error:', error);
-        alert('Login failed: ' + error.message);
+        errorEl.textContent = 'Login failed: ' + error.message;
+        errorEl.classList.remove('hidden');
     }
+}
+
+// Legacy function for compatibility
+async function loginAsAdmin() {
+    showLoginModal();
 }
 
 async function logoutAdmin() {
@@ -100,40 +129,27 @@ async function logoutAdmin() {
 }
 
 function updateUIForAdminMode() {
-    const newItemBtn = document.getElementById('addBtnText');
+    const loginBtn = document.getElementById('loginBtn');
+    const logoutBtn = document.getElementById('logoutBtn');
+    const newItemBtn = document.getElementById('newItemBtn');
     const addFormContainer = document.getElementById('addForm');
     
     if (useSupabase && !isAdmin) {
-        // 읽기 전용 모드 - 버튼 숨기기
-        if (newItemBtn && newItemBtn.parentElement) {
-            newItemBtn.parentElement.style.display = 'none';
-        }
-        if (addFormContainer) {
-            addFormContainer.style.display = 'none';
-        }
-        
-        // 로그인 버튼 추가
-        const header = document.querySelector('.flex.flex-col.md\\:flex-row');
-        if (header && !document.getElementById('adminLoginBtn')) {
-            const loginBtn = document.createElement('button');
-            loginBtn.id = 'adminLoginBtn';
-            loginBtn.onclick = loginAsAdmin;
-            loginBtn.className = 'border border-gray-300 text-gray-700 px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-50 transition-all';
-            loginBtn.textContent = 'Admin Login';
-            header.querySelector('.flex.flex-wrap').appendChild(loginBtn);
-        }
+        // 읽기 전용 모드 - 로그인 버튼만 표시
+        if (loginBtn) loginBtn.classList.remove('hidden');
+        if (logoutBtn) logoutBtn.classList.add('hidden');
+        if (newItemBtn) newItemBtn.classList.add('hidden');
+        if (addFormContainer) addFormContainer.classList.add('hidden');
     } else if (useSupabase && isAdmin) {
-        // 관리자 모드 - 버튼 보이기
-        if (newItemBtn && newItemBtn.parentElement) {
-            newItemBtn.parentElement.style.display = 'inline-block';
-        }
-        
-        // 로그아웃 버튼으로 변경
-        const loginBtn = document.getElementById('adminLoginBtn');
-        if (loginBtn) {
-            loginBtn.textContent = 'Admin Logout';
-            loginBtn.onclick = logoutAdmin;
-        }
+        // 관리자 모드 - 로그아웃, New Item 버튼 표시
+        if (loginBtn) loginBtn.classList.add('hidden');
+        if (logoutBtn) logoutBtn.classList.remove('hidden');
+        if (newItemBtn) newItemBtn.classList.remove('hidden');
+    } else if (!useSupabase) {
+        // localStorage 모드 - 모든 기능 사용 가능
+        if (loginBtn) loginBtn.classList.add('hidden');
+        if (logoutBtn) logoutBtn.classList.add('hidden');
+        if (newItemBtn) newItemBtn.classList.remove('hidden');
     }
 }
 
