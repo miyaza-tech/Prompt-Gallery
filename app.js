@@ -66,13 +66,17 @@ async function checkAdminStatus() {
     try {
         const { data: { user } } = await supabase.auth.getUser();
         
+        console.log('checkAdminStatus - user:', user ? user.email : 'null', 'ADMIN_EMAILS:', ADMIN_EMAILS);
+        
         if (user && ADMIN_EMAILS.includes(user.email)) {
             isAdmin = true;
-            console.log('Admin authenticated:', user.email);
+            console.log('✓ Admin authenticated:', user.email);
         } else {
             isAdmin = false;
-            console.log('Read-only mode');
+            console.log('✗ Read-only mode', user ? '(user: ' + user.email + ')' : '(no user)');
         }
+        
+        console.log('isAdmin is now:', isAdmin);
     } catch (error) {
         console.error('Error checking admin status:', error);
         isAdmin = false;
@@ -152,24 +156,35 @@ async function logoutAdmin() {
 }
 
 function updateUIForAdminMode() {
+    console.log('updateUIForAdminMode called - useSupabase:', useSupabase, 'isAdmin:', isAdmin);
+    
     const loginBtn = document.getElementById('loginBtn');
     const logoutBtn = document.getElementById('logoutBtn');
     const newItemBtn = document.getElementById('newItemBtn');
     const addFormContainer = document.getElementById('addForm');
     
+    console.log('Buttons found:', {
+        loginBtn: !!loginBtn,
+        logoutBtn: !!logoutBtn,
+        newItemBtn: !!newItemBtn
+    });
+    
     if (useSupabase && !isAdmin) {
         // 읽기 전용 모드 - 로그인 버튼만 표시
+        console.log('→ Setting READ-ONLY mode');
         if (loginBtn) loginBtn.classList.remove('hidden');
         if (logoutBtn) logoutBtn.classList.add('hidden');
         if (newItemBtn) newItemBtn.classList.add('hidden');
         if (addFormContainer) addFormContainer.classList.add('hidden');
     } else if (useSupabase && isAdmin) {
         // 관리자 모드 - 로그아웃, New Item 버튼 표시
+        console.log('→ Setting ADMIN mode');
         if (loginBtn) loginBtn.classList.add('hidden');
         if (logoutBtn) logoutBtn.classList.remove('hidden');
         if (newItemBtn) newItemBtn.classList.remove('hidden');
     } else if (!useSupabase) {
         // localStorage 모드 - 모든 기능 사용 가능
+        console.log('→ Setting localStorage mode');
         if (loginBtn) loginBtn.classList.add('hidden');
         if (logoutBtn) logoutBtn.classList.add('hidden');
         if (newItemBtn) newItemBtn.classList.remove('hidden');
