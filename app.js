@@ -68,15 +68,20 @@ async function checkAdminStatus() {
 }
 
 async function loginAsAdmin() {
+    const email = prompt('Enter admin email:');
+    const password = prompt('Enter password:');
+    
+    if (!email || !password) return;
+    
     try {
-        const { error } = await supabase.auth.signInWithOAuth({
-            provider: 'google',
-            options: {
-                redirectTo: window.location.origin
-            }
+        const { error } = await supabase.auth.signInWithPassword({
+            email: email,
+            password: password
         });
         
         if (error) throw error;
+        
+        alert('Login successful!');
     } catch (error) {
         console.error('Login error:', error);
         alert('Login failed: ' + error.message);
