@@ -94,7 +94,23 @@ prompt-gallery-static/
 - Vercel: GitHub 연동
 - Cloudflare Pages: GitHub 연동
 
-## 🔧 커스터마이징
+## �️ Supabase 연동 (선택사항)
+
+### Supabase 설정
+1. Supabase 프로젝트 생성
+2. SQL Editor에서 테이블 생성 (스키마는 문서 참조)
+3. `supabase-config.js` 파일 수정:
+```javascript
+const SUPABASE_URL = 'https://your-project.supabase.co';
+const SUPABASE_ANON_KEY = 'your-anon-key';
+```
+
+### 동작 방식
+- Supabase 설정이 완료되면 자동으로 데이터베이스 사용
+- 설정이 없으면 localStorage로 폴백
+- 여러 사용자가 데이터를 공유 가능
+
+## �🔧 커스터마이징
 
 ### 카테고리 추가
 `index.html`과 `app.js`에서 카테고리 배열 수정:

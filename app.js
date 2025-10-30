@@ -3,13 +3,113 @@ let items = [];
 let currentFilter = 'All';
 let uploadType = 'url';
 let editingId = null;
+let useSupabase = false; // Supabase 사용 여부
 
 // Initialize on page load
-document.addEventListener('DOMContentLoaded', function() {
-    loadItems();
+document.addEventListener('DOMContentLoaded', async function() {
+    // Supabase 연결 확인
+    try {
+        if (typeof supabase !== 'undefined' && SUPABASE_URL !== 'YOUR_SUPABASE_URL') {
+            useSupabase = true;
+            console.log('Supabase mode enabled');
+            await loadItemsFromSupabase();
+        } else {
+            console.log('localStorage mode enabled');
+            loadItems();
+        }
+    } catch (error) {
+        console.error('Supabase initialization failed, using localStorage:', error);
+        loadItems();
+    }
+    
     renderGallery();
     updateButtonVisibility();
 });
+
+// Supabase functions
+async function loadItemsFromSupabase() {
+    try {
+        const { data, error } = await supabase
+            .from('prompts')
+            .select('*')
+            .order('created_at', { ascending: false });
+        
+        if (error) throw error;
+        
+        // Supabase 데이터를 기존 형식으로 변환
+        items = data.map(item => ({
+            id: item.id,
+            prompt: item.prompt,
+            category: item.category,
+            image: item.image || '',
+            srefCode: item.sref_code || '',
+            createdAt: item.created_at
+        }));
+        
+        console.log('Loaded from Supabase:', items.length, 'items');
+    } catch (error) {
+        console.error('Error loading from Supabase:', error);
+        alert('Failed to load data from database. Check console for details.');
+    }
+}
+
+async function saveItemToSupabase(item) {
+    try {
+        const { data, error } = await supabase
+            .from('prompts')
+            .insert([{
+                prompt: item.prompt,
+                category: item.category,
+                image: item.image || null,
+                sref_code: item.srefCode || null
+            }])
+            .select();
+        
+        if (error) throw error;
+        
+        // 새로 생성된 ID로 업데이트
+        return data[0];
+    } catch (error) {
+        console.error('Error saving to Supabase:', error);
+        alert('Failed to save to database: ' + error.message);
+        throw error;
+    }
+}
+
+async function updateItemInSupabase(id, updates) {
+    try {
+        const { error } = await supabase
+            .from('prompts')
+            .update({
+                prompt: updates.prompt,
+                category: updates.category,
+                image: updates.image || null,
+                sref_code: updates.srefCode || null
+            })
+            .eq('id', id);
+        
+        if (error) throw error;
+    } catch (error) {
+        console.error('Error updating in Supabase:', error);
+        alert('Failed to update in database: ' + error.message);
+        throw error;
+    }
+}
+
+async function deleteItemFromSupabase(id) {
+    try {
+        const { error } = await supabase
+            .from('prompts')
+            .delete()
+            .eq('id', id);
+        
+        if (error) throw error;
+    } catch (error) {
+        console.error('Error deleting from Supabase:', error);
+        alert('Failed to delete from database: ' + error.message);
+        throw error;
+    }
+}
 
 // localStorage persistence
 function loadItems() {
@@ -23,6 +123,8 @@ function loadItems() {
 }
 
 function saveItems() {
+    if (useSupabase) return; // Supabase 모드에서는 사용 안 함
+    
     try {
         localStorage.setItem('promptGalleryItems', JSON.stringify(items));
     } catch (error) {
@@ -112,34 +214,82 @@ function addItem() {
     saveItemWithImage(prompt, category, imageSource, srefCode);
 }
 
-function saveItemWithImage(prompt, category, image, srefCode) {
-    if (editingId) {
-        // Update existing item
-        const itemIndex = items.findIndex(item => item.id === editingId);
-        if (itemIndex !== -1) {
-            items[itemIndex] = {
-                ...items[itemIndex],
+async function saveItemWithImage(prompt, category, image, srefCode) {
+    if (useSupabase) {
+        // Supabase 모드
+        try {
+            if (editingId) {
+                // Update existing item
+                await updateItemInSupabase(editingId, {
+                    prompt: prompt,
+                    category: category,
+                    image: image,
+                    srefCode: srefCode || ''
+                });
+                
+                const itemIndex = items.findIndex(item => item.id === editingId);
+                if (itemIndex !== -1) {
+                    items[itemIndex] = {
+                        ...items[itemIndex],
+                        prompt: prompt,
+                        category: category,
+                        image: image,
+                        srefCode: srefCode || ''
+                    };
+                }
+                editingId = null;
+            } else {
+                // Create new item
+                const newItem = await saveItemToSupabase({
+                    prompt: prompt,
+                    category: category,
+                    image: image,
+                    srefCode: srefCode || ''
+                });
+                
+                items.unshift({
+                    id: newItem.id,
+                    prompt: newItem.prompt,
+                    category: newItem.category,
+                    image: newItem.image || '',
+                    srefCode: newItem.sref_code || '',
+                    createdAt: newItem.created_at
+                });
+            }
+        } catch (error) {
+            console.error('Failed to save:', error);
+            return;
+        }
+    } else {
+        // localStorage 모드
+        if (editingId) {
+            // Update existing item
+            const itemIndex = items.findIndex(item => item.id === editingId);
+            if (itemIndex !== -1) {
+                items[itemIndex] = {
+                    ...items[itemIndex],
+                    prompt: prompt,
+                    category: category,
+                    image: image,
+                    srefCode: srefCode || ''
+                };
+            }
+            editingId = null;
+        } else {
+            // Create new item
+            const newItem = {
+                id: Date.now(),
                 prompt: prompt,
                 category: category,
                 image: image,
-                srefCode: srefCode || ''
+                srefCode: srefCode || '',
+                createdAt: new Date().toISOString()
             };
+            items.unshift(newItem);
         }
-        editingId = null;
-    } else {
-        // Create new item
-        const newItem = {
-            id: Date.now(),
-            prompt: prompt,
-            category: category,
-            image: image,
-            srefCode: srefCode || '',
-            createdAt: new Date().toISOString()
-        };
-        items.unshift(newItem);
+        saveItems();
     }
     
-    saveItems();
     renderGallery();
     toggleForm();
     resetForm();
@@ -288,9 +438,23 @@ function updateItem() {
     saveUpdatedItem(prompt, category, imageSource, srefCode);
 }
 
-function saveUpdatedItem(prompt, category, image, srefCode) {
+async function saveUpdatedItem(prompt, category, image, srefCode) {
     const itemIndex = items.findIndex(item => item.id === editingId);
     if (itemIndex !== -1) {
+        if (useSupabase) {
+            try {
+                await updateItemInSupabase(editingId, {
+                    prompt: prompt,
+                    category: category,
+                    image: image,
+                    srefCode: srefCode || ''
+                });
+            } catch (error) {
+                console.error('Failed to update:', error);
+                return;
+            }
+        }
+        
         items[itemIndex] = {
             ...items[itemIndex],
             prompt: prompt,
@@ -301,19 +465,28 @@ function saveUpdatedItem(prompt, category, image, srefCode) {
     }
     
     editingId = null;
-    saveItems();
+    if (!useSupabase) saveItems();
     renderGallery();
     closeEditForm();
     updateButtonVisibility();
 }
 
-function deleteCurrentItem() {
+async function deleteCurrentItem() {
     if (!editingId) return;
     
     if (confirm('Delete this prompt? This cannot be undone.')) {
+        if (useSupabase) {
+            try {
+                await deleteItemFromSupabase(editingId);
+            } catch (error) {
+                console.error('Failed to delete:', error);
+                return;
+            }
+        }
+        
         items = items.filter(item => item.id !== editingId);
         editingId = null;
-        saveItems();
+        if (!useSupabase) saveItems();
         renderGallery();
         closeEditForm();
         updateButtonVisibility();
