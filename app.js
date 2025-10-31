@@ -160,9 +160,11 @@ async function loginAsAdmin() {
 
 async function logoutAdmin() {
     try {
+        console.log('Logging out...');
         await supabase.auth.signOut();
-        // 페이지 새로고침으로 확실하게 UI 업데이트
-        window.location.reload();
+        console.log('Sign out complete, reloading page...');
+        // 강제 새로고침 (캐시 무시)
+        window.location.href = window.location.href.split('?')[0];
     } catch (error) {
         console.error('Logout error:', error);
         alert('Logout failed: ' + error.message);
