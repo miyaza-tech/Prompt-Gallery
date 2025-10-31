@@ -104,9 +104,16 @@ function showLoginModal() {
 
 // Close login modal
 function closeLoginModal() {
+    console.log('closeLoginModal called');
     const modal = document.getElementById('loginModal');
+    if (!modal) {
+        console.error('Login modal not found when trying to close!');
+        return;
+    }
+    console.log('Modal classes before:', modal.classList.toString());
     modal.classList.add('hidden');
     modal.classList.remove('flex');
+    console.log('Modal classes after:', modal.classList.toString());
     document.getElementById('loginEmail').value = '';
     document.getElementById('loginPassword').value = '';
     document.getElementById('loginError').classList.add('hidden');
@@ -138,10 +145,13 @@ async function loginAdmin() {
         if (error) throw error;
         
         console.log('Login successful:', data);
+        console.log('Closing login modal...');
         closeLoginModal();
+        console.log('Modal closed');
         
         // 로그인 성공 후 즉시 UI 업데이트
         setTimeout(async () => {
+            console.log('Updating UI after login...');
             await checkAdminStatus();
             updateUIForAdminMode();
             renderGallery();
