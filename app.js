@@ -161,11 +161,11 @@ async function loginAsAdmin() {
 async function logoutAdmin() {
     try {
         await supabase.auth.signOut();
-        isAdmin = false;
-        updateUIForAdminMode();
-        alert('Logged out successfully');
+        // 페이지 새로고침으로 확실하게 UI 업데이트
+        window.location.reload();
     } catch (error) {
         console.error('Logout error:', error);
+        alert('Logout failed: ' + error.message);
     }
 }
 
