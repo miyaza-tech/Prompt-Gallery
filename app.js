@@ -24,24 +24,25 @@ document.addEventListener('DOMContentLoaded', async function() {
             // Auth 상태 변경 리스너
             supabase.auth.onAuthStateChange(async (event, session) => {
                 console.log('Auth state changed:', event, session ? 'User: ' + session.user.email : 'No user');
+                
+                // 로그인 모달 닫기
                 if (event === 'SIGNED_IN') {
-                    // 로그인 모달 닫기
                     const modal = document.getElementById('loginModal');
                     if (modal && !modal.classList.contains('hidden')) {
                         closeLoginModal();
                     }
-                    
-                    await checkAdminStatus();
-                    updateUIForAdminMode();
-                    renderGallery();
-                } else if (event === 'SIGNED_OUT') {
-                    isAdmin = false;
-                    updateUIForAdminMode();
+                }
+                
+                // 항상 관리자 상태 재확인
+                await checkAdminStatus();
+                updateUIForAdminMode();
+                
+                if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
                     renderGallery();
                 }
             });
             
-            // 관리자 확인
+            // 초기 관리자 확인
             await checkAdminStatus();
             
             await loadItemsFromSupabase();
@@ -132,6 +133,13 @@ async function loginAdmin() {
         
         console.log('Login successful:', data);
         closeLoginModal();
+        
+        // 로그인 성공 후 즉시 UI 업데이트
+        setTimeout(async () => {
+            await checkAdminStatus();
+            updateUIForAdminMode();
+            renderGallery();
+        }, 500); // Auth 상태 업데이트를 위한 짧은 딜레이
     } catch (error) {
         console.error('Login error:', error);
         errorEl.textContent = 'Login failed: ' + error.message;
