@@ -24,6 +24,7 @@ document.addEventListener('DOMContentLoaded', async function() {
             // Auth 상태 변경 리스너
             supabase.auth.onAuthStateChange(async (event, session) => {
                 console.log('Auth state changed:', event, session ? 'User: ' + session.user.email : 'No user');
+                console.log('Processing auth state change...');
                 
                 // 로그인 모달 닫기
                 if (event === 'SIGNED_IN') {
@@ -34,12 +35,17 @@ document.addEventListener('DOMContentLoaded', async function() {
                 }
                 
                 // 항상 관리자 상태 재확인
+                console.log('Calling checkAdminStatus from auth listener...');
                 await checkAdminStatus();
+                console.log('Calling updateUIForAdminMode from auth listener...');
                 updateUIForAdminMode();
                 
                 if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
+                    console.log('Calling renderGallery from auth listener...');
                     renderGallery();
                 }
+                
+                console.log('Auth state change processing complete');
             });
             
             // 초기 관리자 확인
