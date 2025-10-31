@@ -731,10 +731,14 @@ function handleEditFileUpload(event) {
     reader.readAsDataURL(file);
 }
 
-function deleteItem(id) {
+async function deleteItem(id) {
     if (confirm('Delete this item?')) {
-        items = items.filter(item => item.id !== id);
-        saveItems();
+        if (useSupabase) {
+            await deleteItemFromSupabase(id);
+        } else {
+            items = items.filter(item => item.id !== id);
+            saveItems();
+        }
         renderGallery();
         updateButtonVisibility();
     }
