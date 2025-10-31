@@ -94,12 +94,15 @@
             </div>
         </div>
 
-        <!-- Add Form -->
-        <div id="addForm" class="border border-gray-200 bg-gray-50 p-8 mb-12 hidden">
-            <div class="flex justify-between items-center mb-6">
-                <h2 class="text-2xl font-light text-gray-900">Add New Prompt</h2>
-                <button onclick="toggleForm()" class="text-gray-400 hover:text-gray-900 text-2xl transition-colors">×</button>
-            </div>
+        <!-- Add Form Modal -->
+        <div id="addForm" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 hidden">
+            <div class="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto m-4">
+                <div class="sticky top-0 bg-white border-b border-gray-200 px-8 py-6 flex justify-between items-center">
+                    <h2 class="text-2xl font-light text-gray-900">Add New Prompt</h2>
+                    <button onclick="toggleForm()" class="text-gray-400 hover:text-gray-900 text-2xl transition-colors">×</button>
+                </div>
+                
+                <div class="p-8">
 
             <div class="space-y-6">
                 <!-- Upload Type -->
@@ -172,6 +175,7 @@
                 <button onclick="addItem()" class="w-full bg-gray-900 text-white py-3.5 rounded-lg text-sm font-medium hover:bg-gray-800 transition-all">
                     <span id="submitBtnText">Add Prompt</span>
                 </button>
+                </div>
             </div>
         </div>
 

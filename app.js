@@ -322,22 +322,38 @@ function saveItems() {
 
 // Form management
 function toggleForm() {
+    // 관리자가 아니면 경고 메시지 표시
+    if (useSupabase && !isAdmin) {
+        alert('관리자만 프롬프트를 추가할 수 있습니다.\n\nOnly administrators can add prompts.');
+        return;
+    }
+    
     const form = document.getElementById('addForm');
     const btn = document.getElementById('addBtnText');
     const submitBtn = document.getElementById('submitBtnText');
     
     if (form.classList.contains('hidden')) {
         form.classList.remove('hidden');
+        document.body.style.overflow = 'hidden'; // 배경 스크롤 방지
         btn.textContent = editingId ? 'Cancel Edit' : 'Close';
         if (submitBtn) submitBtn.textContent = editingId ? 'Update Prompt' : 'Add Prompt';
     } else {
         form.classList.add('hidden');
+        document.body.style.overflow = ''; // 스크롤 복원
         btn.textContent = 'New Item';
         if (submitBtn) submitBtn.textContent = 'Add Prompt';
         editingId = null;
         resetForm();
     }
 }
+
+// 모달 외부 클릭 시 닫기
+document.addEventListener('click', function(e) {
+    const modal = document.getElementById('addForm');
+    if (e.target === modal) {
+        toggleForm();
+    }
+});
 
 function resetForm() {
     document.getElementById('prompt').value = '';
