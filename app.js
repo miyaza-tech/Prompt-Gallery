@@ -145,17 +145,7 @@ async function loginAdmin() {
         if (error) throw error;
         
         console.log('Login successful:', data);
-        console.log('Closing login modal...');
-        closeLoginModal();
-        console.log('Modal closed');
-        
-        // 로그인 성공 후 즉시 UI 업데이트
-        setTimeout(async () => {
-            console.log('Updating UI after login...');
-            await checkAdminStatus();
-            updateUIForAdminMode();
-            renderGallery();
-        }, 500); // Auth 상태 업데이트를 위한 짧은 딜레이
+        // Auth 리스너가 자동으로 모달을 닫고 UI를 업데이트합니다
     } catch (error) {
         console.error('Login error:', error);
         errorEl.textContent = 'Login failed: ' + error.message;
