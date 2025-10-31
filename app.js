@@ -159,12 +159,16 @@ async function loginAsAdmin() {
 }
 
 async function logoutAdmin() {
+    if (!confirm('Are you sure you want to logout?')) return;
+    
     try {
         console.log('Logging out...');
-        await supabase.auth.signOut();
-        console.log('Sign out complete, reloading page...');
-        // 강제 새로고침 (캐시 무시)
-        window.location.href = window.location.href.split('?')[0];
+        // signOut를 기다리지 않고 바로 리로드
+        supabase.auth.signOut();
+        // 즉시 페이지 리로드
+        setTimeout(() => {
+            window.location.href = window.location.origin + window.location.pathname;
+        }, 100);
     } catch (error) {
         console.error('Logout error:', error);
         alert('Logout failed: ' + error.message);
