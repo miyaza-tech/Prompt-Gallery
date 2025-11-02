@@ -7,32 +7,35 @@ let selectedCategories = [];
 let selectedEditCategories = [];
 
 // Initialize on page load
-document.addEventListener('DOMContentLoaded', function() {
-    loadItems();
+document.addEventListener('DOMContentLoaded', async function() {
+    await loadItems();
     renderGallery();
     updateButtonVisibility();
+    subscribeToRealtime();
 });
 
-// localStorage persistence
-function loadItems() {
+// Supabase Database persistence
+async function loadItems() {
     try {
-        const saved = localStorage.getItem('promptGalleryItems');
-        items = saved ? JSON.parse(saved) : [];
+        const { data, error } = await supabase
+            .from('prompts')
+            .select('*')
+            .order('created_at', { ascending: false });
+        
+        if (error) throw error;
+        
+        items = data || [];
+        console.log(`Loaded ${items.length} items from Supabase`);
     } catch (error) {
         console.error('Error loading items:', error);
         items = [];
     }
 }
 
+// No longer needed - replaced with direct Supabase insert/update/delete
 function saveItems() {
-    try {
-        localStorage.setItem('promptGalleryItems', JSON.stringify(items));
-    } catch (error) {
-        if (error.name === 'QuotaExceededError') {
-            alert('Storage quota exceeded. Please export and clear some items.');
-        }
-        console.error('Error saving items:', error);
-    }
+    // This function is kept for backward compatibility but no longer used
+    console.warn('saveItems() is deprecated - use direct Supabase operations');
 }
 
 // Form management
@@ -174,38 +177,48 @@ function addItem() {
     saveItemWithImage(prompt, category, sref, imageSource);
 }
 
-function saveItemWithImage(prompt, category, sref, image) {
-    if (editingId) {
-        // Update existing item
-        const itemIndex = items.findIndex(item => item.id === editingId);
-        if (itemIndex !== -1) {
-            items[itemIndex] = {
-                ...items[itemIndex],
-                prompt: prompt,
-                category: category,
-                sref: sref,
-                image: image
-            };
+async function saveItemWithImage(prompt, category, sref, image) {
+    try {
+        if (editingId) {
+            // Update existing item in Supabase
+            const { error } = await supabase
+                .from('prompts')
+                .update({
+                    prompt: prompt,
+                    category: category,
+                    sref: sref,
+                    image: image
+                })
+                .eq('id', editingId);
+            
+            if (error) throw error;
+            console.log('Item updated in Supabase');
+            editingId = null;
+        } else {
+            // Create new item in Supabase
+            const { error } = await supabase
+                .from('prompts')
+                .insert([{
+                    prompt: prompt,
+                    category: category,
+                    sref: sref,
+                    image: image
+                }]);
+            
+            if (error) throw error;
+            console.log('New item added to Supabase');
         }
-        editingId = null;
-    } else {
-        // Create new item
-        const newItem = {
-            id: Date.now(),
-            prompt: prompt,
-            category: category,
-            sref: sref,
-            image: image,
-            createdAt: new Date().toISOString()
-        };
-        items.unshift(newItem);
+        
+        // Reload items from Supabase
+        await loadItems();
+        renderGallery();
+        toggleForm();
+        resetForm();
+        updateButtonVisibility();
+    } catch (error) {
+        console.error('Error saving item:', error);
+        alert('Failed to save item. Please try again.');
     }
-    
-    saveItems();
-    renderGallery();
-    toggleForm();
-    resetForm();
-    updateButtonVisibility();
 }
 
 function editItem(id) {
@@ -383,35 +396,58 @@ function updateItem() {
     saveUpdatedItem(prompt, category, sref, imageSource);
 }
 
-function saveUpdatedItem(prompt, category, sref, image) {
-    const itemIndex = items.findIndex(item => item.id === editingId);
-    if (itemIndex !== -1) {
-        items[itemIndex] = {
-            ...items[itemIndex],
-            prompt: prompt,
-            category: category,
-            sref: sref,
-            image: image
-        };
-    }
-    
-    editingId = null;
-    saveItems();
-    renderGallery();
-    closeEditForm();
-    updateButtonVisibility();
-}
-
-function deleteCurrentItem() {
-    if (!editingId) return;
-    
-    if (confirm('Delete this prompt? This cannot be undone.')) {
-        items = items.filter(item => item.id !== editingId);
+async function saveUpdatedItem(prompt, category, sref, image) {
+    try {
+        const { error } = await supabase
+            .from('prompts')
+            .update({
+                prompt: prompt,
+                category: category,
+                sref: sref,
+                image: image
+            })
+            .eq('id', editingId);
+        
+        if (error) throw error;
+        
+        console.log('Item updated in Supabase');
         editingId = null;
-        saveItems();
+        
+        // Reload items from Supabase
+        await loadItems();
         renderGallery();
         closeEditForm();
         updateButtonVisibility();
+    } catch (error) {
+        console.error('Error updating item:', error);
+        alert('Failed to update item. Please try again.');
+    }
+}
+
+async function deleteCurrentItem() {
+    if (!editingId) return;
+    
+    if (confirm('Delete this prompt? This cannot be undone.')) {
+        try {
+            const { error } = await supabase
+                .from('prompts')
+                .delete()
+                .eq('id', editingId);
+            
+            if (error) throw error;
+            
+            console.log('Item deleted from Supabase');
+            editingId = null;
+            
+            // Reload items from Supabase
+            await loadItems();
+            renderGallery();
+            closeEditForm();
+            updateButtonVisibility();
+        } catch (error) {
+            console.error('Error deleting item:', error);
+            alert('Failed to delete item. Please try again.');
+        }
     }
 }
 
@@ -474,12 +510,26 @@ function handleEditFileUpload(event) {
     reader.readAsDataURL(file);
 }
 
-function deleteItem(id) {
+async function deleteItem(id) {
     if (confirm('Delete this item?')) {
-        items = items.filter(item => item.id !== id);
-        saveItems();
-        renderGallery();
-        updateButtonVisibility();
+        try {
+            const { error } = await supabase
+                .from('prompts')
+                .delete()
+                .eq('id', id);
+            
+            if (error) throw error;
+            
+            console.log('Item deleted from Supabase');
+            
+            // Reload items from Supabase
+            await loadItems();
+            renderGallery();
+            updateButtonVisibility();
+        } catch (error) {
+            console.error('Error deleting item:', error);
+            alert('Failed to delete item. Please try again.');
+        }
     }
 }
 
@@ -759,4 +809,33 @@ function updateButtonVisibility() {
     if (exportBtn) {
         hasItems ? exportBtn.classList.remove('hidden') : exportBtn.classList.add('hidden');
     }
+}
+
+// Supabase Realtime subscription for cross-device sync
+function subscribeToRealtime() {
+    supabase
+        .channel('prompts-channel')
+        .on(
+            'postgres_changes',
+            {
+                event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
+                schema: 'public',
+                table: 'prompts'
+            },
+            async (payload) => {
+                console.log('Realtime update received:', payload);
+                
+                // Reload data from Supabase when any change occurs
+                await loadItems();
+                renderGallery();
+                updateButtonVisibility();
+            }
+        )
+        .subscribe((status) => {
+            if (status === 'SUBSCRIBED') {
+                console.log('✅ Realtime subscription active - syncing across devices');
+            } else if (status === 'CHANNEL_ERROR') {
+                console.error('❌ Realtime subscription error');
+            }
+        });
 }
