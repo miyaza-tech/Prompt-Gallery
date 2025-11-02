@@ -20,7 +20,7 @@ document.addEventListener('DOMContentLoaded', async function() {
 async function loadItems() {
     try {
         const { data, error } = await supabase
-            .from('prompts')
+            .from('Prompt-Gallery')
             .select('*')
             .order('created_at', { ascending: false });
         
@@ -184,7 +184,7 @@ async function saveItemWithImage(prompt, category, sref, image) {
         if (editingId) {
             // Update existing item in Supabase
             const { error } = await supabase
-                .from('prompts')
+                .from('Prompt-Gallery')
                 .update({
                     prompt: prompt,
                     category: category,
@@ -199,7 +199,7 @@ async function saveItemWithImage(prompt, category, sref, image) {
         } else {
             // Create new item in Supabase
             const { error } = await supabase
-                .from('prompts')
+                .from('Prompt-Gallery')
                 .insert([{
                     prompt: prompt,
                     category: category,
@@ -401,7 +401,7 @@ function updateItem() {
 async function saveUpdatedItem(prompt, category, sref, image) {
     try {
         const { error } = await supabase
-            .from('prompts')
+            .from('Prompt-Gallery')
             .update({
                 prompt: prompt,
                 category: category,
@@ -432,7 +432,7 @@ async function deleteCurrentItem() {
     if (confirm('Delete this prompt? This cannot be undone.')) {
         try {
             const { error } = await supabase
-                .from('prompts')
+                .from('Prompt-Gallery')
                 .delete()
                 .eq('id', editingId);
             
@@ -516,7 +516,7 @@ async function deleteItem(id) {
     if (confirm('Delete this item?')) {
         try {
             const { error } = await supabase
-                .from('prompts')
+                .from('Prompt-Gallery')
                 .delete()
                 .eq('id', id);
             
@@ -816,13 +816,13 @@ function updateButtonVisibility() {
 // Supabase Realtime subscription for cross-device sync
 function subscribeToRealtime() {
     supabase
-        .channel('prompts-channel')
+        .channel('prompt-gallery-channel')
         .on(
             'postgres_changes',
             {
                 event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
                 schema: 'public',
-                table: 'prompts'
+                table: 'Prompt-Gallery'
             },
             async (payload) => {
                 console.log('Realtime update received:', payload);
