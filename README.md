@@ -1,23 +1,46 @@
-# 🎨 프롬프트 갤러리 (순수 HTML/CSS/JS)
+# 🎨 프롬프트 갤러리
 
 AI 이미지 생성 프롬프트를 수집하고 관리하는 웹 애플리케이션입니다.
 
+## 🌐 Live Demo
+
+**https://miyaza-tech.github.io/Prompt-Gallery/**
+
 ## ✨ 주요 기능
 
-- **프롬프트 추가**: URL 또는 파일 업로드로 이미지와 함께 프롬프트 저장
-- **카테고리 관리**: 나노, GPT, 미드저니, 영상, 실사, 캐주얼, 재패니메이션
-- **필터링**: 카테고리별로 항목 필터링
-- **클립보드 복사**: 원클릭으로 프롬프트 복사 (2초간 피드백)
-- **localStorage 자동 저장**: 브라우저 재시작 후에도 데이터 유지
-- **JSON 가져오기/내보내기**: 백업 및 복원
+### 데이터 관리
+- **Supabase 데이터베이스**: PostgreSQL 기반 실시간 동기화
+- **Supabase Storage**: 이미지 파일 업로드 (최대 10MB, 1GB 무료 스토리지)
+- **실시간 동기화**: 여러 PC/브라우저에서 동시 사용 가능
+- **JSON 백업/복원**: 데이터 내보내기 및 가져오기
+
+### 프롬프트 관리
+- **다중 카테고리 선택**: Nano, GPT, Midjourney, Video, Photo, real_ch, real_bg, US_ch, US_bg, JP_ch, JP_bg, etc (12개 카테고리)
+- **다중 필터**: 여러 카테고리 동시 필터링 (OR 조건)
+- **_sref 필드**: 스타일 참조 코드 저장
+- **이미지 지원**: URL 또는 파일 업로드 (Supabase Storage 통합)
+- **클립보드 복사**: 프롬프트 및 _sref 원클릭 복사
+
+### 보안 & 권한
+- **Row Level Security (RLS)**: 읽기는 모두, 쓰기는 인증된 사용자만
+- **로그인 시스템**: Supabase Authentication 연동
+- **자동 이미지 관리**: 프롬프트 삭제 시 Storage 이미지도 자동 삭제
+
+### UI/UX
+- **모달 팝업 폼**: Add/Edit 폼이 중앙 팝업으로 표시
+- **4열 그리드 레이아웃**: 카드 형태의 갤러리 뷰
+- **카테고리 배지**: 각 카드에 선택된 카테고리 표시
 - **반응형 디자인**: 모바일, 태블릿, 데스크톱 지원
 
-## 🚀 실행 방법
+## 🚀 시작하기
 
-### 방법 1: 직접 열기
-`index.html` 파일을 더블클릭하여 브라우저에서 바로 실행
+### 온라인 사용 (권장)
+**https://miyaza-tech.github.io/Prompt-Gallery/**
 
-### 방법 2: 로컬 서버 (권장)
+- 읽기 전용: 로그인 없이 프롬프트 보기 및 복사 가능
+- 편집 권한: 관리자만 로그인하여 추가/수정/삭제 가능
+
+### 로컬 개발
 ```bash
 # Python 3
 python -m http.server 8000
@@ -28,52 +51,85 @@ python -m http.server 8000
 ## 📁 파일 구조
 
 ```
-prompt-gallery-static/
-├── index.html    # 메인 HTML (Tailwind CDN 포함)
-├── app.js        # 모든 JavaScript 로직
-└── README.md     # 이 파일
+prompt-gallery/
+├── css/
+│   └── style.css               # 커스텀 스타일 (모달 애니메이션, 스크롤바)
+├── js/
+│   ├── app.js                  # 메인 로직 (CRUD, 필터링, 인증)
+│   └── supabase-config.js      # Supabase 클라이언트 설정
+├── data/                       # JSON 백업 저장용 (옵션)
+├── assets/                     # 정적 파일 (이미지, 아이콘)
+├── .github/
+│   └── copilot-instructions.md # AI 코딩 가이드
+├── index.html                  # 메인 HTML
+├── README.md                   # 이 파일
+└── .gitignore
 ```
 
 ## 🛠️ 기술 스택
 
-- **순수 HTML5**: 별도의 빌드 과정 불필요
-- **Tailwind CSS**: CDN으로 로드
-- **Vanilla JavaScript**: 프레임워크 없음
-- **localStorage**: 데이터 영속성
+### Frontend
+- **Vanilla JavaScript**: 프레임워크 없음 (~1000 lines)
+- **Tailwind CSS**: CDN (v3.x)
+- **HTML5**: 시맨틱 마크업
+
+### Backend (Supabase)
+- **Database**: PostgreSQL (Prompt-Gallery 테이블)
+- **Storage**: 이미지 파일 저장 (prompt-images 버킷)
+- **Authentication**: Email/Password 로그인
+- **Realtime**: 실시간 데이터 동기화
 
 ## 📝 사용 방법
 
-1. **새 항목 추가**: "새 항목" 버튼 클릭
-2. **이미지 선택**: 
-   - URL 입력: 이미지 링크 붙여넣기
-   - 파일 업로드: 로컬 이미지 선택 (최대 5MB)
-3. **카테고리 선택**: 드롭다운에서 선택
-4. **프롬프트 입력**: 최대 1000자
-5. **필터링**: 상단 카테고리 버튼 클릭
-6. **복사**: 카드의 "프롬프트 복사" 버튼
-7. **백업**: "내보내기" → JSON 다운로드
-8. **복원**: "가져오기" → JSON 업로드 (병합/교체 선택)
+### 일반 사용자 (로그인 불필요)
+1. **프롬프트 보기**: 갤러리에서 모든 프롬프트 확인
+2. **필터링**: 상단 카테고리 버튼으로 다중 필터 (여러 개 동시 선택 가능)
+3. **복사**: 카드 호버 → "_sref" 또는 "prompt" 버튼 클릭
 
-## 🎯 특징
+### 관리자 (로그인 필요)
+1. **로그인**: 우측 상단 "Login" 버튼
+2. **새 항목 추가**: "New Item" 버튼 클릭
+   - **이미지 선택**:
+     - URL: 외부 이미지 링크 입력
+     - File: 로컬 파일 업로드 (최대 10MB, Supabase Storage 자동 업로드)
+   - **카테고리 선택**: 버튼 형태로 여러 개 선택 가능 (회색 배경 = 선택됨)
+   - **프롬프트 입력**: 최대 1000자
+   - **_sref 입력**: 스타일 참조 코드
+3. **수정/삭제**: 카드 호버 → "edit" 버튼
+4. **백업**: "Export" → JSON 다운로드
+5. **복원**: "Import" → JSON 업로드
 
-### localStorage 자동 동기화
-- 항목 추가/삭제 시 자동 저장
-- 브라우저 재시작 후에도 데이터 유지
+## 🎯 주요 특징
 
-### 이미지 업로드
-- URL: 외부 이미지 링크 지원
-- 파일: Base64 인코딩하여 저장 (5MB 제한)
-- 이미지 로드 실패 시 플레이스홀더 표시
+### 실시간 동기화
+- Supabase Realtime으로 모든 변경사항 즉시 반영
+- 여러 기기에서 동시 작업 가능
+- 자동 새로고침 없이 실시간 업데이트
+
+### 이미지 관리
+- **Supabase Storage 통합**: 1GB 무료 스토리지
+- **파일 업로드**: 최대 10MB (자동 업로드 및 URL 생성)
+- **URL 지원**: 외부 이미지 링크 직접 입력
+- **자동 삭제**: 프롬프트 삭제 시 Storage 이미지도 함께 삭제
+- 약 1,000개 이미지 저장 가능 (1MB 기준)
+
+### 보안 시스템
+- **Row Level Security (RLS)**: 
+  - SELECT: 누구나 읽기 가능
+  - INSERT/UPDATE/DELETE: 인증된 사용자만
+- **인증 시스템**: Supabase Authentication
+- **UI 권한 제어**: 로그인 상태에 따라 버튼 표시/숨김
+
+### 다중 카테고리
+- 버튼 UI로 여러 카테고리 동시 선택
+- 각 프롬프트에 여러 카테고리 할당 가능
+- 카테고리 배지로 시각적 표시
 
 ### 유효성 검사
-- URL 형식 확인
-- 파일 크기 제한 (5MB)
+- 파일 크기 제한 (10MB)
 - 프롬프트 길이 제한 (1000자)
-- 실시간 글자 수 표시
-
-### JSON 백업/복원
-- 날짜별 파일명: `prompt-gallery-backup-2025-10-17.json`
-- 가져오기 시 병합 또는 교체 선택 가능
+- 실시간 글자 수 카운터
+- 필수 입력 검증
 
 ## 💡 브라우저 호환성
 
@@ -82,40 +138,130 @@ prompt-gallery-static/
 - Safari 14+
 - Edge 90+
 
+## � Supabase 설정
+
+### 1. 프로젝트 생성
+1. https://supabase.com 에서 프로젝트 생성
+2. Settings → API에서 URL과 anon key 확인
+
+### 2. 데이터베이스 테이블
+```sql
+CREATE TABLE "Prompt-Gallery" (
+  id BIGSERIAL PRIMARY KEY,
+  prompt TEXT NOT NULL,
+  category TEXT,
+  sref TEXT,
+  image TEXT,
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+```
+
+### 3. Row Level Security (RLS)
+```sql
+ALTER TABLE "Prompt-Gallery" ENABLE ROW LEVEL SECURITY;
+
+-- 읽기는 모두 가능
+CREATE POLICY "Anyone can read prompts"
+ON "Prompt-Gallery" FOR SELECT
+USING (true);
+
+-- 쓰기는 인증된 사용자만
+CREATE POLICY "Only authenticated users can insert"
+ON "Prompt-Gallery" FOR INSERT
+WITH CHECK (auth.uid() IS NOT NULL);
+
+CREATE POLICY "Only authenticated users can update"
+ON "Prompt-Gallery" FOR UPDATE
+USING (auth.uid() IS NOT NULL);
+
+CREATE POLICY "Only authenticated users can delete"
+ON "Prompt-Gallery" FOR DELETE
+USING (auth.uid() IS NOT NULL);
+```
+
+### 4. Storage 설정
+1. Storage → New bucket → `prompt-images` (Public)
+2. Policies 설정:
+```sql
+-- 읽기는 모두 가능
+CREATE POLICY "Public read access"
+ON storage.objects FOR SELECT
+USING (bucket_id = 'prompt-images');
+
+-- 업로드는 인증된 사용자만
+CREATE POLICY "Authenticated users can upload"
+ON storage.objects FOR INSERT
+WITH CHECK (bucket_id = 'prompt-images' AND auth.uid() IS NOT NULL);
+
+-- 삭제는 인증된 사용자만
+CREATE POLICY "Authenticated users can delete"
+ON storage.objects FOR DELETE
+USING (bucket_id = 'prompt-images' AND auth.uid() IS NOT NULL);
+```
+
+### 5. Authentication 설정
+1. Authentication → Providers → Email 활성화
+2. Enable Email provider 켜기
+3. Authentication → Users → Add User로 관리자 계정 생성
+
 ## 📦 배포
 
-### GitHub Pages
-1. GitHub에 업로드
-2. Settings → Pages → Source: main branch
-3. 자동 배포됨
+### GitHub Pages (현재 배포됨)
+```bash
+# main 브랜치에 커밋
+git add .
+git commit -m "Update"
+git push origin main
 
-### 기타 호스팅
-- Netlify: 드래그 앤 드롭
-- Vercel: GitHub 연동
-- Cloudflare Pages: GitHub 연동
+# gh-pages 브랜치에 배포
+git checkout gh-pages
+git merge main
+git push origin gh-pages
+git checkout main
+```
+
+### 환경 변수
+`js/supabase-config.js`에 Supabase 자격 증명 입력:
+```javascript
+const SUPABASE_URL = 'your-project-url';
+const SUPABASE_ANON_KEY = 'your-anon-key';
+```
 
 ## 🔧 커스터마이징
 
 ### 카테고리 추가
-`index.html`과 `app.js`에서 카테고리 배열 수정:
+`index.html`에서 세 곳 수정:
+1. Add Form의 카테고리 버튼
+2. Edit Form의 카테고리 버튼
+3. 상단 필터 바 버튼
 
+### 파일 크기 제한 변경
+`js/app.js`에서 수정:
 ```javascript
-// app.js에는 별도 배열 없음
-// index.html의 select와 filterBar에서 직접 수정
+if (file.size > 10 * 1024 * 1024) { // 10MB
 ```
 
-### 색상 변경
-Tailwind 클래스 수정 (예: `bg-purple-600` → `bg-blue-600`)
+## 💡 브라우저 호환성
 
-### 저장 용량 확장
-localStorage는 브라우저당 약 5-10MB 제한
-더 큰 용량 필요 시 IndexedDB 사용 고려
+- Chrome 90+
+- Firefox 88+
+- Safari 14+
+- Edge 90+
 
-## 🐛 알려진 제한사항
+## 🐛 트러블슈팅
 
-- localStorage 용량 제한 (브라우저당 5-10MB)
-- 대용량 이미지는 Base64 인코딩 시 용량 증가
-- 오프라인 모드 없음 (URL 이미지는 인터넷 필요)
+### 이미지가 안 보여요
+- Supabase Storage 버킷이 Public인지 확인
+- Storage Policies가 올바르게 설정되었는지 확인
+
+### 로그인이 안 돼요
+- Authentication Email Provider가 활성화되었는지 확인
+- 계정이 생성되었는지 확인 (Authentication → Users)
+
+### 추가/수정/삭제가 안 돼요
+- 로그인했는지 확인
+- RLS 정책이 올바르게 설정되었는지 확인
+- 브라우저 콘솔에서 에러 메시지 확인
 
 ## 📄 라이선스
 

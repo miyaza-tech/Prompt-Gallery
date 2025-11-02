@@ -1,25 +1,130 @@
 prompt-gallery/
 ├── css/
-│   └── style.css               ✅ 커스텀 스타일 (애니메이션, 스크롤바)
+│   └── style.css               ✅ 커스텀 스타일 (모달 애니메이션, 스크롤바)
 ├── js/
-│   └── app.js                  ✅ 모든 JavaScript 로직 (785 lines)
+│   ├── app.js                  ✅ 메인 로직 (~1000 lines)
+│   │                              - CRUD 작업 (Supabase Database)
+│   │                              - Supabase Storage 업로드/삭제
+│   │                              - 실시간 동기화 (Realtime)
+│   │                              - 인증 시스템 (Auth)
+│   │                              - 다중 카테고리 & 필터링
+│   │                              - 모달 UI 관리
+│   └── supabase-config.js      ✅ Supabase 클라이언트 설정
+│                                  - Project URL & API Key
 ├── data/
-│   └── (사용자 JSON 백업 저장용)
+│   └── (JSON 백업 파일 저장용, 선택사항)
 ├── assets/
 │   └── (이미지, 아이콘 등 정적 파일)
-├── public/
 ├── .github/
 │   └── copilot-instructions.md ✅ AI 코딩 가이드
-├── index.html                  ✅ 메인 HTML (Tailwind CDN)
+│                                  - 프로젝트 아키텍처 설명
+│                                  - Dual Form 패턴 (Add/Edit)
+│                                  - Supabase 통합 가이드
+├── index.html                  ✅ 메인 HTML
+│                                  - Tailwind CSS (CDN)
+│                                  - Add/Edit 모달 폼
+│                                  - 로그인 모달
+│                                  - 카테고리 버튼 그리드
+│                                  - 필터 바
 ├── README.md                   ✅ 프로젝트 문서
+│                                  - 기능 설명
+│                                  - Supabase 설정 가이드
+│                                  - 배포 방법
 ├── 지침.txt                    ✅ 사용 가이드
 ├── 추가된 기능들.txt
 ├── 폴더구조.txt                ✅ 이 파일
 └── .gitignore
 
-📁 폴더 설명:
-- css/     : 커스텀 CSS 스타일 (Tailwind 외 추가 스타일)
-- js/      : JavaScript 로직 (전역 상태, CRUD, localStorage)
-- data/    : JSON 백업 파일 저장용 (선택사항)
-- assets/  : 이미지, 아이콘 등 정적 에셋
-- public/  : 빌드 없이 제공되는 파일들
+========================================
+📁 상세 설명
+========================================
+
+css/ - 커스텀 스타일
+  - 모달 애니메이션 (fadeIn, slideUp)
+  - 스크롤바 커스터마이징
+  - Tailwind로 불가능한 추가 스타일
+
+js/app.js - 메인 애플리케이션 로직
+  [전역 상태]
+  - items[], currentUser, selectedCategories[], activeFilters[]
+  
+  [Supabase Database]
+  - loadItems(): SELECT 쿼리
+  - saveItemWithImage(): INSERT/UPDATE
+  - deleteItem(): DELETE + Storage 이미지 삭제
+  
+  [Supabase Storage]
+  - uploadImageToStorage(): 파일 업로드 (10MB)
+  - deleteImageFromStorage(): 이미지 삭제
+  
+  [Realtime 동기화]
+  - subscribeToRealtime(): postgres_changes 구독
+  
+  [Authentication]
+  - checkAuthStatus(): 로그인 상태 확인
+  - login(), logout(): 인증 처리
+  - updateUIForAuth(): 권한별 UI 제어
+  
+  [UI 관리]
+  - toggleForm(), closeEditForm(): 모달 제어
+  - toggleCategory(), toggleEditCategory(): 다중 선택
+  - filterItems(): 다중 필터링 (OR 조건)
+  - renderGallery(), createItemCard(): 렌더링
+
+js/supabase-config.js - Supabase 설정
+  - SUPABASE_URL, SUPABASE_ANON_KEY
+  - supabase 클라이언트 초기화
+
+========================================
+🗄️ Supabase 구조
+========================================
+
+Database:
+  - Table: "Prompt-Gallery"
+    * id (bigserial)
+    * prompt (text)
+    * category (text) - 쉼표로 구분된 다중 카테고리
+    * sref (text)
+    * image (text) - Storage URL 또는 외부 URL
+    * created_at (timestamptz)
+
+Storage:
+  - Bucket: "prompt-images" (Public)
+    * 이미지 파일 저장 (최대 10MB)
+    * 무료 플랜: 1GB (약 1,000개 이미지)
+
+Authentication:
+  - Email/Password 로그인
+  - 관리자 계정만 수동 생성
+
+Realtime:
+  - postgres_changes 구독
+  - INSERT/UPDATE/DELETE 이벤트 실시간 감지
+
+========================================
+🔒 보안 정책 (RLS)
+========================================
+
+Database (Prompt-Gallery):
+  ✅ SELECT: 누구나 가능
+  🔒 INSERT/UPDATE/DELETE: auth.uid() IS NOT NULL
+
+Storage (prompt-images):
+  ✅ SELECT: 누구나 가능
+  🔒 INSERT/DELETE: auth.uid() IS NOT NULL
+
+========================================
+🚀 배포 구조
+========================================
+
+GitHub Repository: Prompt-Gallery
+  - main 브랜치: 소스 코드
+  - gh-pages 브랜치: 배포용
+
+GitHub Pages:
+  - https://miyaza-tech.github.io/Prompt-Gallery/
+  - gh-pages 브랜치 자동 배포
+
+Supabase Project:
+  - Database: uhwnbjmfcakbkbxvhpgx.supabase.co
+  - 무료 플랜: 500MB DB + 1GB Storage
