@@ -5,9 +5,11 @@ let uploadType = 'url';
 let editingId = null;
 let selectedCategories = [];
 let selectedEditCategories = [];
+let currentUser = null;
 
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', async function() {
+    await checkAuthStatus();
     await loadItems();
     renderGallery();
     updateButtonVisibility();
@@ -731,9 +733,9 @@ function createItemCard(item) {
         '<button onclick=\"copyPrompt(\'' + jsEscapedPrompt + '\')\" ' +
         'class=\"bg-gray-900 text-white px-3 py-2 rounded-lg text-sm font-medium opacity-0 group-hover:opacity-100 transition-all transform translate-y-2 group-hover:translate-y-0 hover:bg-gray-800\">' +
         'prompt</button>' +
-        '<button onclick=\"editItem(' + item.id + ')\" ' +
+        (currentUser ? '<button onclick=\"editItem(' + item.id + ')\" ' +
         'class=\"bg-gray-900 text-white px-3 py-2 rounded-lg text-sm font-medium opacity-0 group-hover:opacity-100 transition-all transform translate-y-2 group-hover:translate-y-0 hover:bg-gray-800\">' +
-        'edit</button>' +
+        'edit</button>' : '') +
         '</div>' +
         '</div>' +
         '</div>';
@@ -838,4 +840,114 @@ function subscribeToRealtime() {
                 console.error('❌ Realtime subscription error');
             }
         });
+}
+
+// Authentication functions
+async function checkAuthStatus() {
+    try {
+        const { data: { user } } = await supabase.auth.getUser();
+        currentUser = user;
+        updateUIForAuth();
+        
+        if (user) {
+            console.log('✅ Logged in as:', user.email);
+        } else {
+            console.log('ℹ️ Not logged in - read-only mode');
+        }
+    } catch (error) {
+        console.error('Error checking auth status:', error);
+        currentUser = null;
+        updateUIForAuth();
+    }
+}
+
+function updateUIForAuth() {
+    const loginBtn = document.getElementById('loginBtn');
+    const logoutBtn = document.getElementById('logoutBtn');
+    const newItemBtn = document.getElementById('newItemBtn');
+    const importBtn = document.getElementById('importBtn');
+    const exportBtn = document.getElementById('exportBtn');
+    
+    if (currentUser) {
+        // Logged in - show edit buttons
+        if (loginBtn) loginBtn.classList.add('hidden');
+        if (logoutBtn) logoutBtn.classList.remove('hidden');
+        if (newItemBtn) newItemBtn.classList.remove('hidden');
+        if (importBtn) importBtn.classList.remove('hidden');
+        if (exportBtn && items.length > 0) exportBtn.classList.remove('hidden');
+    } else {
+        // Not logged in - hide edit buttons
+        if (loginBtn) loginBtn.classList.remove('hidden');
+        if (logoutBtn) logoutBtn.classList.add('hidden');
+        if (newItemBtn) newItemBtn.classList.add('hidden');
+        if (importBtn) importBtn.classList.add('hidden');
+        if (exportBtn) exportBtn.classList.add('hidden');
+    }
+    
+    // Update edit/delete buttons on cards
+    renderGallery();
+}
+
+function toggleLoginModal() {
+    const modal = document.getElementById('loginModal');
+    if (modal.classList.contains('hidden')) {
+        modal.classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+    } else {
+        modal.classList.add('hidden');
+        document.body.style.overflow = '';
+        // Clear form
+        document.getElementById('loginEmail').value = '';
+        document.getElementById('loginPassword').value = '';
+        document.getElementById('loginError').classList.add('hidden');
+    }
+}
+
+async function login() {
+    const email = document.getElementById('loginEmail').value.trim();
+    const password = document.getElementById('loginPassword').value;
+    const errorEl = document.getElementById('loginError');
+    
+    if (!email || !password) {
+        errorEl.textContent = 'Please enter email and password';
+        errorEl.classList.remove('hidden');
+        return;
+    }
+    
+    try {
+        const { data, error } = await supabase.auth.signInWithPassword({
+            email: email,
+            password: password
+        });
+        
+        if (error) throw error;
+        
+        currentUser = data.user;
+        console.log('✅ Login successful:', currentUser.email);
+        
+        toggleLoginModal();
+        updateUIForAuth();
+        alert('Login successful!');
+    } catch (error) {
+        console.error('Login error:', error);
+        errorEl.textContent = error.message || 'Login failed';
+        errorEl.classList.remove('hidden');
+    }
+}
+
+async function logout() {
+    if (confirm('Logout?')) {
+        try {
+            const { error } = await supabase.auth.signOut();
+            if (error) throw error;
+            
+            currentUser = null;
+            console.log('✅ Logged out');
+            updateUIForAuth();
+            alert('Logged out successfully');
+        } catch (error) {
+            console.error('Logout error:', error);
+            alert('Logout failed: ' + error.message);
+        }
+    }
 }

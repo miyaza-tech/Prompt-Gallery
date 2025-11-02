@@ -23,7 +23,15 @@
                 </div>
                 
                 <div class="flex flex-wrap gap-2">
-                    <button onclick="toggleForm()" class="bg-gray-900 text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-800 transition-all">
+                    <!-- Login/Logout Button -->
+                    <button onclick="toggleLoginModal()" id="loginBtn" class="bg-blue-600 text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-blue-700 transition-all">
+                        Login
+                    </button>
+                    <button onclick="logout()" id="logoutBtn" class="bg-gray-600 text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-700 transition-all hidden">
+                        Logout
+                    </button>
+                    
+                    <button onclick="toggleForm()" id="newItemBtn" class="bg-gray-900 text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-800 transition-all hidden">
                         <span id="addBtnText">New Item</span>
                     </button>
                     
@@ -238,6 +246,38 @@
     </div>
 
     <input type="file" id="importFile" accept=".json" onchange="handleImport(event)" class="hidden">
+
+    <!-- Login Modal -->
+    <div id="loginModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden" onclick="closeModalOnBackdrop(event, 'loginModal')">
+        <div class="bg-white rounded-xl shadow-2xl p-8 max-w-md w-full mx-4" onclick="event.stopPropagation()">
+            <div class="flex justify-between items-center mb-6">
+                <h2 class="text-2xl font-light text-gray-900">Login</h2>
+                <button onclick="toggleLoginModal()" class="text-gray-400 hover:text-gray-900 text-2xl transition-colors">×</button>
+            </div>
+            
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Email</label>
+                    <input type="email" id="loginEmail" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="your@email.com">
+                </div>
+                
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Password</label>
+                    <input type="password" id="loginPassword" class="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent" placeholder="••••••••">
+                </div>
+                
+                <div id="loginError" class="text-red-600 text-sm hidden"></div>
+                
+                <button onclick="login()" class="w-full bg-blue-600 text-white py-2.5 rounded-lg font-medium hover:bg-blue-700 transition-all">
+                    Login
+                </button>
+                
+                <p class="text-center text-sm text-gray-500 mt-4">
+                    Contact admin for access
+                </p>
+            </div>
+        </div>
+    </div>
 
     <!-- Supabase JS SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
