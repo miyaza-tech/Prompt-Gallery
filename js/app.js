@@ -130,7 +130,7 @@ function resetForm() {
 }
 
 // CRUD operations
-function addItem() {
+async function addItem() {
     const prompt = document.getElementById('prompt').value.trim();
     const sref = document.getElementById('sref').value.trim();
     
@@ -146,23 +146,23 @@ function addItem() {
     
     const category = selectedCategories.join(', ');
     
-    // Handle file upload (async)
+    // Handle file upload to Supabase Storage
     if (uploadType === 'file') {
         const fileEl = document.getElementById('imageFile');
         if (fileEl && fileEl.files[0]) {
             const file = fileEl.files[0];
             
-            // Validate file size
-            if (file.size > 5 * 1024 * 1024) {
-                showError('fileError', 'File size must be less than 5MB');
+            // Validate file size (increased to 10MB for Storage)
+            if (file.size > 10 * 1024 * 1024) {
+                showError('fileError', 'File size must be less than 10MB');
                 return;
             }
             
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                saveItemWithImage(prompt, category, sref, e.target.result);
-            };
-            reader.readAsDataURL(file);
+            // Upload to Supabase Storage
+            const imageUrl = await uploadImageToStorage(file);
+            if (imageUrl) {
+                await saveItemWithImage(prompt, category, sref, imageUrl);
+            }
             return;
         }
     }
@@ -176,7 +176,7 @@ function addItem() {
         }
     }
     
-    saveItemWithImage(prompt, category, sref, imageSource);
+    await saveItemWithImage(prompt, category, sref, imageSource);
 }
 
 async function saveItemWithImage(prompt, category, sref, image) {
@@ -342,7 +342,7 @@ function resetEditForm() {
     updateEditCharCount();
 }
 
-function updateItem() {
+async function updateItem() {
     if (!editingId) return;
     
     const prompt = document.getElementById('editPrompt').value.trim();
@@ -360,22 +360,28 @@ function updateItem() {
     
     const category = selectedEditCategories.join(', ');
     
-    // Handle file upload (async)
+    // Handle file upload to Supabase Storage
     if (uploadType === 'file') {
         const fileEl = document.getElementById('editImageFile');
         if (fileEl && fileEl.files[0]) {
             const file = fileEl.files[0];
             
-            if (file.size > 5 * 1024 * 1024) {
-                showError('editFileError', 'File size must be less than 5MB');
+            if (file.size > 10 * 1024 * 1024) {
+                showError('editFileError', 'File size must be less than 10MB');
                 return;
             }
             
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                saveUpdatedItem(prompt, category, sref, e.target.result);
-            };
-            reader.readAsDataURL(file);
+            // Delete old image if it exists in Storage
+            const item = items.find(item => item.id === editingId);
+            if (item && item.image && item.image.includes('prompt-images')) {
+                await deleteImageFromStorage(item.image);
+            }
+            
+            // Upload new image
+            const imageUrl = await uploadImageToStorage(file);
+            if (imageUrl) {
+                await saveUpdatedItem(prompt, category, sref, imageUrl);
+            }
             return;
         }
     }
@@ -395,7 +401,7 @@ function updateItem() {
         imageSource = item.image;
     }
     
-    saveUpdatedItem(prompt, category, sref, imageSource);
+    await saveUpdatedItem(prompt, category, sref, imageSource);
 }
 
 async function saveUpdatedItem(prompt, category, sref, image) {
@@ -431,6 +437,13 @@ async function deleteCurrentItem() {
     
     if (confirm('Delete this prompt? This cannot be undone.')) {
         try {
+            // Delete image from Storage if it exists
+            const item = items.find(item => item.id === editingId);
+            if (item && item.image && item.image.includes('prompt-images')) {
+                await deleteImageFromStorage(item.image);
+            }
+            
+            // Delete item from database
             const { error } = await supabase
                 .from('Prompt-Gallery')
                 .delete()
@@ -493,8 +506,8 @@ function handleEditFileUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
     
-    if (file.size > 5 * 1024 * 1024) {
-        showError('editFileError', 'File size must be less than 5MB');
+    if (file.size > 10 * 1024 * 1024) {
+        showError('editFileError', 'File size must be less than 10MB');
         event.target.value = '';
         return;
     }
@@ -515,6 +528,13 @@ function handleEditFileUpload(event) {
 async function deleteItem(id) {
     if (confirm('Delete this item?')) {
         try {
+            // Delete image from Storage if it exists
+            const item = items.find(item => item.id === id);
+            if (item && item.image && item.image.includes('prompt-images')) {
+                await deleteImageFromStorage(item.image);
+            }
+            
+            // Delete item from database
             const { error } = await supabase
                 .from('Prompt-Gallery')
                 .delete()
@@ -603,13 +623,68 @@ function setUploadType(type) {
     }
 }
 
+// Supabase Storage upload function
+async function uploadImageToStorage(file) {
+    try {
+        // Generate unique filename
+        const fileExt = file.name.split('.').pop();
+        const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
+        const filePath = `${fileName}`;
+        
+        console.log('Uploading image to Storage:', filePath);
+        
+        // Upload to Supabase Storage
+        const { data, error } = await supabase.storage
+            .from('prompt-images')
+            .upload(filePath, file, {
+                cacheControl: '3600',
+                upsert: false
+            });
+        
+        if (error) throw error;
+        
+        // Get public URL
+        const { data: { publicUrl } } = supabase.storage
+            .from('prompt-images')
+            .getPublicUrl(filePath);
+        
+        console.log('Image uploaded successfully:', publicUrl);
+        return publicUrl;
+        
+    } catch (error) {
+        console.error('Error uploading image:', error);
+        alert('Failed to upload image: ' + error.message);
+        return null;
+    }
+}
+
+// Delete image from Storage
+async function deleteImageFromStorage(imageUrl) {
+    try {
+        // Extract file path from URL
+        const urlParts = imageUrl.split('/prompt-images/');
+        if (urlParts.length < 2) return; // Not a Storage URL
+        
+        const filePath = urlParts[1].split('?')[0]; // Remove query params
+        
+        const { error } = await supabase.storage
+            .from('prompt-images')
+            .remove([filePath]);
+        
+        if (error) throw error;
+        console.log('Image deleted from Storage:', filePath);
+    } catch (error) {
+        console.error('Error deleting image:', error);
+    }
+}
+
 function handleFileUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
     
-    // Validate file size (5MB limit)
-    if (file.size > 5 * 1024 * 1024) {
-        showError('fileError', 'File size must be less than 5MB');
+    // Validate file size (10MB limit for Storage)
+    if (file.size > 10 * 1024 * 1024) {
+        showError('fileError', 'File size must be less than 10MB');
         event.target.value = '';
         return;
     }
