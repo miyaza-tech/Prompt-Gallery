@@ -1,0 +1,25 @@
+prompt-gallery/
+├── css/
+│   └── style.css               ✅ 커스텀 스타일 (애니메이션, 스크롤바)
+├── js/
+│   └── app.js                  ✅ 모든 JavaScript 로직 (785 lines)
+├── data/
+│   └── (사용자 JSON 백업 저장용)
+├── assets/
+│   └── (이미지, 아이콘 등 정적 파일)
+├── public/
+├── .github/
+│   └── copilot-instructions.md ✅ AI 코딩 가이드
+├── index.html                  ✅ 메인 HTML (Tailwind CDN)
+├── README.md                   ✅ 프로젝트 문서
+├── 지침.txt                    ✅ 사용 가이드
+├── 추가된 기능들.txt
+├── 폴더구조.txt                ✅ 이 파일
+└── .gitignore
+
+📁 폴더 설명:
+- css/     : 커스텀 CSS 스타일 (Tailwind 외 추가 스타일)
+- js/      : JavaScript 로직 (전역 상태, CRUD, localStorage)
+- data/    : JSON 백업 파일 저장용 (선택사항)
+- assets/  : 이미지, 아이콘 등 정적 에셋
+- public/  : 빌드 없이 제공되는 파일들

@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Prompt Gallery</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="css/style.css">
+</head>
+<body class="bg-white min-h-screen antialiased">
+    <div id="app" class="px-6 py-12 max-w-7xl mx-auto">
+        <!-- Header -->
+        <div class="mb-16">
+            <div class="flex flex-col md:flex-row md:justify-between md:items-start gap-6">
+                <div>
+                    <h1 onclick="goToHome()" class="text-5xl font-light text-gray-900 mb-3 tracking-tight cursor-pointer hover:text-gray-700 transition-colors">Prompt Gallery</h1>
+                    <p class="text-sm text-gray-500 font-light">
+                        <span id="itemCount" class="font-medium text-gray-900">0</span> prompts collected
+                    </p>
+                </div>
+                
+                <div class="flex flex-wrap gap-2">
+                    <button onclick="toggleForm()" class="bg-gray-900 text-white px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-800 transition-all">
+                        <span id="addBtnText">New Item</span>
+                    </button>
+                    
+                    <button onclick="importData()" id="importBtn" class="border border-gray-300 text-gray-700 px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-50 transition-all hidden">
+                        Import
+                    </button>
+                    
+                    <button onclick="exportData()" id="exportBtn" class="border border-gray-300 text-gray-700 px-5 py-2.5 rounded-lg text-sm font-medium hover:bg-gray-50 transition-all hidden">
+                        Export
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Add Form Modal -->
+        <div id="addFormModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden" onclick="closeModalOnBackdrop(event, 'addFormModal')">
+            <div id="addForm" class="bg-white rounded-xl shadow-2xl p-8 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-light text-gray-900">Add New Prompt</h2>
+                    <button onclick="toggleForm()" class="text-gray-400 hover:text-gray-900 text-2xl transition-colors">×</button>
+                </div>
+
+            <div class="space-y-6">
+                <!-- Upload Type -->
+                <div>
+                    <label class="block text-xs uppercase tracking-wider text-gray-500 font-medium mb-3">Upload Type</label>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button onclick="setUploadType('url')" id="urlBtn" class="py-3 px-4 rounded-lg text-sm border-2 border-gray-900 bg-gray-900 text-white transition-all">
+                            URL
+                        </button>
+                        <button onclick="setUploadType('file')" id="fileBtn" class="py-3 px-4 rounded-lg text-sm border border-gray-300 hover:border-gray-400 transition-all">
+                            File Upload
+                        </button>
+                    </div>
+                </div>
+
+                <!-- URL Input -->
+                <div id="urlInput">
+                    <label class="block text-xs uppercase tracking-wider text-gray-500 font-medium mb-3">Image URL</label>
+                    <input type="text" id="imageUrl" placeholder="https://example.com/image.jpg" class="w-full px-4 py-3 rounded-lg text-sm border border-gray-300 focus:border-gray-900 focus:outline-none transition-colors">
+                    <p id="urlError" class="text-red-600 text-xs mt-2 hidden"></p>
+                </div>
+
+                <!-- File Upload -->
+                <div id="fileInput" class="hidden">
+                    <label class="block text-xs uppercase tracking-wider text-gray-500 font-medium mb-3">
+                        Image File <span class="text-gray-400 normal-case font-normal">(max 5MB)</span>
+                    </label>
+                    <input type="file" id="imageFile" accept="image/*" onchange="handleFileUpload(event)" class="w-full px-4 py-3 rounded-lg text-sm border border-gray-300 focus:border-gray-900 focus:outline-none transition-colors">
+                    <p id="fileError" class="text-red-600 text-xs mt-2 hidden"></p>
+                    <img id="imagePreview" class="mt-4 w-full h-48 object-cover rounded-lg hidden">
+                </div>
+
+                <!-- Category -->
+                <div>
+                    <label class="block text-xs uppercase tracking-wider text-gray-500 font-medium mb-3">Category (Multiple Selection)</label>
+                    <div id="categoryButtons" class="flex flex-wrap gap-2">
+                        <button type="button" onclick="toggleCategory('Nano')" class="category-btn px-4 py-2 rounded-lg text-sm border border-gray-300 hover:border-gray-400 transition-all" data-category="Nano">Nano</button>
+                        <button type="button" onclick="toggleCategory('GPT')" class="category-btn px-4 py-2 rounded-lg text-sm border border-gray-300 hover:border-gray-400 transition-all" data-category="GPT">GPT</button>
+                        <button type="button" onclick="toggleCategory('Midjourney')" class="category-btn px-4 py-2 rounded-lg text-sm border border-gray-300 hover:border-gray-400 transition-all" data-category="Midjourney">Midjourney</button>
+                        <button type="button" onclick="toggleCategory('Video')" class="category-btn px-4 py-2 rounded-lg text-sm border border-gray-300 hover:border-gray-400 transition-all" data-category="Video">Video</button>
+                        <button type="button" onclick="toggleCategory('Photo')" class="category-btn px-4 py-2 rounded-lg text-sm border border-gray-300 hover:border-gray-400 transition-all" data-category="Photo">Photo</button>
+                        <button type="button" onclick="toggleCategory('real_ch')" class="category-btn px-4 py-2 rounded-lg text-sm border border-gray-300 hover:border-gray-400 transition-all" data-category="real_ch">real_ch</button>
+                        <button type="button" onclick="toggleCategory('real_bg')" class="category-btn px-4 py-2 rounded-lg text-sm border border-gray-300 hover:border-gray-400 transition-all" data-category="real_bg">real_bg</button>
+                        <button type="button" onclick="toggleCategory('US_ch')" class="category-btn px-4 py-2 rounded-lg text-sm border border-gray-300 hover:border-gray-400 transition-all" data-category="US_ch">US_ch</button>
+                        <button type="button" onclick="toggleCategory('US_bg')" class="category-btn px-4 py-2 rounded-lg text-sm border border-gray-300 hover:border-gray-400 transition-all" data-category="US_bg">US_bg</button>
+                        <button type="button" onclick="toggleCategory('JP_ch')" class="category-btn px-4 py-2 rounded-lg text-sm border border-gray-300 hover:border-gray-400 transition-all" data-category="JP_ch">JP_ch</button>
+                        <button type="button" onclick="toggleCategory('JP_bg')" class="category-btn px-4 py-2 rounded-lg text-sm border border-gray-300 hover:border-gray-400 transition-all" data-category="JP_bg">JP_bg</button>
+                        <button type="button" onclick="toggleCategory('etc')" class="category-btn px-4 py-2 rounded-lg text-sm border border-gray-300 hover:border-gray-400 transition-all" data-category="etc">etc</button>
+                    </div>
+                    <p id="categoryError" class="text-red-600 text-xs mt-2 hidden"></p>
+                </div>
+
+                <!-- Prompt -->
+                <div>
+                    <label class="block text-xs uppercase tracking-wider text-gray-500 font-medium mb-3">
+                        Prompt 
+                        <span class="text-gray-400 normal-case font-normal" id="charCount">(0/1000)</span>
+                    </label>
+                    <textarea id="prompt" oninput="updateCharCount()" placeholder="Enter your prompt..." rows="6" class="w-full px-4 py-3 rounded-lg text-sm border border-gray-300 focus:border-gray-900 focus:outline-none resize-none transition-colors"></textarea>
+                    <p id="promptError" class="text-red-600 text-xs mt-2 hidden"></p>
+                </div>
+
+                <!-- Sref -->
+                <div>
+                    <label class="block text-xs uppercase tracking-wider text-gray-500 font-medium mb-3">_sref</label>
+                    <input type="text" id="sref" placeholder="Enter _sref code..." class="w-full px-4 py-3 rounded-lg text-sm border border-gray-300 focus:border-gray-900 focus:outline-none transition-colors">
+                </div>
+
+                <!-- Submit Button -->
+                <button onclick="addItem()" class="w-full bg-gray-900 text-white py-3.5 rounded-lg text-sm font-medium hover:bg-gray-800 transition-all">
+                    <span id="submitBtnText">Add Prompt</span>
+                </button>
+            </div>
+            </div>
+        </div>
+
+        <!-- Edit Form Modal -->
+        <div id="editFormModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center hidden" onclick="closeModalOnBackdrop(event, 'editFormModal')">
+            <div id="editForm" class="bg-white rounded-xl shadow-2xl p-8 max-w-2xl w-full mx-4 max-h-[90vh] overflow-y-auto" onclick="event.stopPropagation()">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-2xl font-light text-gray-900">Edit Prompt</h2>
+                    <button onclick="closeEditForm()" class="text-gray-400 hover:text-gray-900 text-2xl transition-colors">×</button>
+                </div>
+
+            <div class="space-y-6">
+                <!-- Upload Type -->
+                <div>
+                    <label class="block text-xs uppercase tracking-wider text-gray-500 font-medium mb-3">Upload Type</label>
+                    <div class="grid grid-cols-2 gap-3">
+                        <button onclick="setEditUploadType('url')" id="editUrlBtn" class="py-3 px-4 rounded-lg text-sm border-2 border-gray-900 bg-gray-900 text-white transition-all">
+                            URL
+                        </button>
+                        <button onclick="setEditUploadType('file')" id="editFileBtn" class="py-3 px-4 rounded-lg text-sm border border-gray-300 hover:border-gray-400 transition-all">
+                            File Upload
+                        </button>
+                    </div>
+                </div>
+
+                <!-- URL Input -->
+                <div id="editUrlInput">
+                    <label class="block text-xs uppercase tracking-wider text-gray-500 font-medium mb-3">Image URL</label>
+                    <input type="text" id="editImageUrl" placeholder="https://example.com/image.jpg" class="w-full px-4 py-3 rounded-lg text-sm border border-gray-300 focus:border-gray-900 focus:outline-none transition-colors">
+                    <p id="editUrlError" class="text-red-600 text-xs mt-2 hidden"></p>
+                </div>
+
+                <!-- File Upload -->
+                <div id="editFileInput" class="hidden">
+                    <label class="block text-xs uppercase tracking-wider text-gray-500 font-medium mb-3">
+                        Image File <span class="text-gray-400 normal-case font-normal">(max 5MB)</span>
+                    </label>
+                    <input type="file" id="editImageFile" accept="image/*" onchange="handleEditFileUpload(event)" class="w-full px-4 py-3 rounded-lg text-sm border border-gray-300 focus:border-gray-900 focus:outline-none transition-colors">
+                    <p id="editFileError" class="text-red-600 text-xs mt-2 hidden"></p>
+                    <img id="editImagePreview" class="mt-4 w-full h-48 object-cover rounded-lg hidden">
+                </div>
+
+                <!-- Category -->
+                <div>
+                    <label class="block text-xs uppercase tracking-wider text-gray-500 font-medium mb-3">Category (Multiple Selection)</label>
+                    <div id="editCategoryButtons" class="flex flex-wrap gap-2">
+                        <button type="button" onclick="toggleEditCategory('Nano')" class="edit-category-btn px-4 py-2 rounded-lg text-sm border border-gray-300 hover:border-gray-400 transition-all" data-category="Nano">Nano</button>
+                        <button type="button" onclick="toggleEditCategory('GPT')" class="edit-category-btn px-4 py-2 rounded-lg text-sm border border-gray-300 hover:border-gray-400 transition-all" data-category="GPT">GPT</button>
+                        <button type="button" onclick="toggleEditCategory('Midjourney')" class="edit-category-btn px-4 py-2 rounded-lg text-sm border border-gray-300 hover:border-gray-400 transition-all" data-category="Midjourney">Midjourney</button>
+                        <button type="button" onclick="toggleEditCategory('Video')" class="edit-category-btn px-4 py-2 rounded-lg text-sm border border-gray-300 hover:border-gray-400 transition-all" data-category="Video">Video</button>
+                        <button type="button" onclick="toggleEditCategory('Photo')" class="edit-category-btn px-4 py-2 rounded-lg text-sm border border-gray-300 hover:border-gray-400 transition-all" data-category="Photo">Photo</button>
+                        <button type="button" onclick="toggleEditCategory('real_ch')" class="edit-category-btn px-4 py-2 rounded-lg text-sm border border-gray-300 hover:border-gray-400 transition-all" data-category="real_ch">real_ch</button>
+                        <button type="button" onclick="toggleEditCategory('real_bg')" class="edit-category-btn px-4 py-2 rounded-lg text-sm border border-gray-300 hover:border-gray-400 transition-all" data-category="real_bg">real_bg</button>
+                        <button type="button" onclick="toggleEditCategory('US_ch')" class="edit-category-btn px-4 py-2 rounded-lg text-sm border border-gray-300 hover:border-gray-400 transition-all" data-category="US_ch">US_ch</button>
+                        <button type="button" onclick="toggleEditCategory('US_bg')" class="edit-category-btn px-4 py-2 rounded-lg text-sm border border-gray-300 hover:border-gray-400 transition-all" data-category="US_bg">US_bg</button>
+                        <button type="button" onclick="toggleEditCategory('JP_ch')" class="edit-category-btn px-4 py-2 rounded-lg text-sm border border-gray-300 hover:border-gray-400 transition-all" data-category="JP_ch">JP_ch</button>
+                        <button type="button" onclick="toggleEditCategory('JP_bg')" class="edit-category-btn px-4 py-2 rounded-lg text-sm border border-gray-300 hover:border-gray-400 transition-all" data-category="JP_bg">JP_bg</button>
+                        <button type="button" onclick="toggleEditCategory('etc')" class="edit-category-btn px-4 py-2 rounded-lg text-sm border border-gray-300 hover:border-gray-400 transition-all" data-category="etc">etc</button>
+                    </div>
+                    <p id="editCategoryError" class="text-red-600 text-xs mt-2 hidden"></p>
+                </div>
+
+                <!-- Prompt -->
+                <div>
+                    <label class="block text-xs uppercase tracking-wider text-gray-500 font-medium mb-3">
+                        Prompt 
+                        <span class="text-gray-400 normal-case font-normal" id="editCharCount">(0/1000)</span>
+                    </label>
+                    <textarea id="editPrompt" oninput="updateEditCharCount()" placeholder="Enter your prompt..." rows="6" class="w-full px-4 py-3 rounded-lg text-sm border border-gray-300 focus:border-gray-900 focus:outline-none resize-none transition-colors"></textarea>
+                    <p id="editPromptError" class="text-red-600 text-xs mt-2 hidden"></p>
+                </div>
+
+                <!-- Sref -->
+                <div>
+                    <label class="block text-xs uppercase tracking-wider text-gray-500 font-medium mb-3">_sref</label>
+                    <input type="text" id="editSref" placeholder="Enter _sref code..." class="w-full px-4 py-3 rounded-lg text-sm border border-gray-300 focus:border-gray-900 focus:outline-none transition-colors">
+                </div>
+
+                <!-- Action Buttons -->
+                <div class="flex gap-3">
+                    <button onclick="updateItem()" class="flex-1 bg-gray-900 text-white py-3.5 rounded-lg text-sm font-medium hover:bg-gray-800 transition-all">
+                        Update Prompt
+                    </button>
+                    <button onclick="deleteCurrentItem()" class="px-6 bg-red-600 text-white py-3.5 rounded-lg text-sm font-medium hover:bg-red-700 transition-all">
+                        Delete
+                    </button>
+                </div>
+            </div>
+        </div>
+        </div>
+
+        <!-- Filter Bar -->
+        <div id="filterBar" class="mb-10 flex flex-wrap gap-2 border-b border-gray-200 pb-6">
+            <button onclick="filterItems('All')" class="filter-btn bg-gray-900 text-white px-5 py-2 rounded-lg text-sm font-medium transition-all" data-category="All">All</button>
+            <button onclick="filterItems('Nano')" class="filter-btn text-gray-600 hover:text-gray-900 px-5 py-2 rounded-lg text-sm font-medium transition-all" data-category="Nano">Nano</button>
+            <button onclick="filterItems('GPT')" class="filter-btn text-gray-600 hover:text-gray-900 px-5 py-2 rounded-lg text-sm font-medium transition-all" data-category="GPT">GPT</button>
+            <button onclick="filterItems('Midjourney')" class="filter-btn text-gray-600 hover:text-gray-900 px-5 py-2 rounded-lg text-sm font-medium transition-all" data-category="Midjourney">Midjourney</button>
+            <button onclick="filterItems('Video')" class="filter-btn text-gray-600 hover:text-gray-900 px-5 py-2 rounded-lg text-sm font-medium transition-all" data-category="Video">Video</button>
+            <button onclick="filterItems('Photo')" class="filter-btn text-gray-600 hover:text-gray-900 px-5 py-2 rounded-lg text-sm font-medium transition-all" data-category="Photo">Photo</button>
+            <button onclick="filterItems('real_ch')" class="filter-btn text-gray-600 hover:text-gray-900 px-5 py-2 rounded-lg text-sm font-medium transition-all" data-category="real_ch">real_ch</button>
+            <button onclick="filterItems('real_bg')" class="filter-btn text-gray-600 hover:text-gray-900 px-5 py-2 rounded-lg text-sm font-medium transition-all" data-category="real_bg">real_bg</button>
+            <button onclick="filterItems('US_ch')" class="filter-btn text-gray-600 hover:text-gray-900 px-5 py-2 rounded-lg text-sm font-medium transition-all" data-category="US_ch">US_ch</button>
+            <button onclick="filterItems('US_bg')" class="filter-btn text-gray-600 hover:text-gray-900 px-5 py-2 rounded-lg text-sm font-medium transition-all" data-category="US_bg">US_bg</button>
+            <button onclick="filterItems('JP_ch')" class="filter-btn text-gray-600 hover:text-gray-900 px-5 py-2 rounded-lg text-sm font-medium transition-all" data-category="JP_ch">JP_ch</button>
+            <button onclick="filterItems('JP_bg')" class="filter-btn text-gray-600 hover:text-gray-900 px-5 py-2 rounded-lg text-sm font-medium transition-all" data-category="JP_bg">JP_bg</button>
+            <button onclick="filterItems('etc')" class="filter-btn text-gray-600 hover:text-gray-900 px-5 py-2 rounded-lg text-sm font-medium transition-all" data-category="etc">etc</button>
+        </div>
+
+        <!-- Gallery -->
+        <div id="gallery" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+            <!-- Empty State -->
+            <div id="emptyState" class="col-span-full text-center py-32">
+                <div class="text-7xl mb-6 opacity-20">✦</div>
+                <p class="text-gray-400 text-base font-light mb-1">No prompts yet</p>
+                <p class="text-gray-300 text-sm font-light">Start by adding your first prompt</p>
+            </div>
+        </div>
+    </div>
+
+    <input type="file" id="importFile" accept=".json" onchange="handleImport(event)" class="hidden">
+
+    <script src="js/app.js"></script>
+</body>
+</html>
