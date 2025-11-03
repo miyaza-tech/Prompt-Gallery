@@ -279,6 +279,16 @@
         </div>
     </div>
 
+    <!-- Image Preview Modal -->
+    <div id="imageModal" class="fixed inset-0 bg-black bg-opacity-90 z-50 hidden">
+        <div class="w-full h-full flex items-center justify-center p-4" onclick="closeImageModal()">
+            <div class="relative max-w-7xl max-h-screen">
+                <button onclick="closeImageModal()" class="absolute -top-12 right-0 text-white hover:text-gray-300 text-4xl font-light">×</button>
+                <img id="modalImage" src="" alt="Preview" class="max-w-full max-h-screen object-contain rounded-lg shadow-2xl" onclick="event.stopPropagation()">
+            </div>
+        </div>
+    </div>
+
     <!-- Supabase JS SDK -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="js/supabase-config.js"></script>
