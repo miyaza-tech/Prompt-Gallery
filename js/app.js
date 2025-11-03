@@ -796,10 +796,10 @@ function attachImageClickListeners() {
 function createItemCard(item) {
     // Image HTML with fallback - add click handler class and data attribute
     const imageHtml = item.image 
-        ? '<div class=\"gallery-image-container w-full h-full cursor-pointer\" data-image-url=\"' + escapeHtml(item.image) + '\">' +
+        ? '<div class=\"gallery-image-container w-full h-full cursor-pointer absolute inset-0\" data-image-url=\"' + escapeHtml(item.image) + '\">' +
           '<img src=\"' + escapeHtml(item.image) + '\" alt=\"Prompt image\" class=\"w-full h-full object-cover\" onerror=\"this.style.display=\'none\';\">' +
           '</div>'
-        : '<div class=\"w-full h-full bg-gray-100 flex items-center justify-center\"><svg class=\"w-12 h-12 text-gray-400\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z\"></path></svg></div>';
+        : '<div class=\"w-full h-full bg-gray-100 flex items-center justify-center absolute inset-0\"><svg class=\"w-12 h-12 text-gray-400\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z\"></path></svg></div>';
     
     // Category badges
     const categories = item.category ? item.category.split(', ') : [];
@@ -815,18 +815,18 @@ function createItemCard(item) {
     return '<div class=\"bg-white rounded-xl shadow-lg overflow-hidden group relative hover:shadow-xl transition-all\">' +
         '<div class=\"aspect-square relative\">' +
         imageHtml +
-        '<div class=\"absolute top-3 left-3 right-3 flex flex-wrap gap-1 pointer-events-none\">' +
+        '<div class=\"absolute top-3 left-3 right-3 flex flex-wrap gap-1 pointer-events-none z-10\">' +
         categoryBadges +
         '</div>' +
-        '<div class=\"absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all flex items-end justify-center pb-6 gap-2\">' +
+        '<div class=\"absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all flex items-end justify-center pb-6 gap-2 pointer-events-none z-10\">' +
         (item.sref ? '<button onclick=\"copySref(\'' + jsEscapedSref + '\')\" ' +
-        'class=\"bg-gray-900 text-white px-3 py-2 rounded-lg text-sm font-medium opacity-0 group-hover:opacity-100 transition-all transform translate-y-2 group-hover:translate-y-0 hover:bg-gray-800\">' +
+        'class=\"bg-gray-900 text-white px-3 py-2 rounded-lg text-sm font-medium opacity-0 group-hover:opacity-100 transition-all transform translate-y-2 group-hover:translate-y-0 hover:bg-gray-800 pointer-events-auto\">' +
         '_sref</button>' : '') +
         '<button onclick=\"copyPrompt(\'' + jsEscapedPrompt + '\')\" ' +
-        'class=\"bg-gray-900 text-white px-3 py-2 rounded-lg text-sm font-medium opacity-0 group-hover:opacity-100 transition-all transform translate-y-2 group-hover:translate-y-0 hover:bg-gray-800\">' +
+        'class=\"bg-gray-900 text-white px-3 py-2 rounded-lg text-sm font-medium opacity-0 group-hover:opacity-100 transition-all transform translate-y-2 group-hover:translate-y-0 hover:bg-gray-800 pointer-events-auto\">' +
         'prompt</button>' +
         (currentUser ? '<button onclick=\"editItem(' + item.id + ')\" ' +
-        'class=\"bg-gray-900 text-white px-3 py-2 rounded-lg text-sm font-medium opacity-0 group-hover:opacity-100 transition-all transform translate-y-2 group-hover:translate-y-0 hover:bg-gray-800\">' +
+        'class=\"bg-gray-900 text-white px-3 py-2 rounded-lg text-sm font-medium opacity-0 group-hover:opacity-100 transition-all transform translate-y-2 group-hover:translate-y-0 hover:bg-gray-800 pointer-events-auto\">' +
         'edit</button>' : '') +
         '</div>' +
         '</div>' +
