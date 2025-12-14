@@ -1,14 +1,15 @@
 # Prompt Gallery - AI Coding Instructions
 
 ## Project Overview
-A vanilla JavaScript web app for collecting and managing AI image generation prompts. Pure client-side with no backend - uses localStorage for persistence and supports JSON import/export for backup.
+A vanilla JavaScript web app for collecting and managing AI image generation prompts. **Migrated from localStorage to Supabase** for real-time cloud persistence, authentication, and file storage. Supports JSON import/export for backup.
 
 ## Architecture & Key Patterns
 
 ### Single-Page App Structure
 - `index.html`: Complete UI structure with Tailwind CSS (CDN)
-- `js/app.js`: All JavaScript logic in one file (785 lines)
-- `css/style.css`: Custom styles (animations, scrollbar)
+- `js/app.js`: All JavaScript logic in one file (~1069 lines)
+- `js/supabase-config.js`: Supabase client initialization
+- `css/style.css`: Custom styles (animations, scrollbar, modals)
 - `data/`: Directory for JSON backups (user-managed)
 - `assets/`: Static files (images, icons)
 - No build process - runs directly in browser or with simple HTTP server
@@ -16,52 +17,121 @@ A vanilla JavaScript web app for collecting and managing AI image generation pro
 ### Core Data Flow
 ```javascript
 // Global state management pattern
-let items = [];              // Main data store
+let items = [];              // Main data store (loaded from Supabase)
 let currentFilter = 'All';   // Filter state
-let uploadType = 'url';      // Form state
-let copiedId = null;         // UI feedback state
+let uploadType = 'url';      // Form state (url/file)
+let editingId = null;        // Edit mode tracking
+let selectedCategories = []; // Multi-select for add form
+let selectedEditCategories = []; // Multi-select for edit form
+let currentUser = null;      // Authentication state
 ```
 
-### localStorage as Database
-- Key: `'promptGalleryItems'`
-- Auto-saves on every add/delete operation
-- Error handling for quota exceeded (5-10MB browser limit)
-- Items stored as array with `{id, prompt, category, image, createdAt}`
+### Supabase Backend Architecture
+**CRITICAL**: Replaced localStorage with Supabase PostgreSQL + Storage + Auth
+- **Database**: `Prompt-Gallery` table with Row Level Security (RLS)
+  - Reads: Public (no auth required)
+  - Writes: Authenticated users only
+- **Storage**: `prompt-images` bucket for file uploads (10MB limit)
+  - Images auto-deleted when prompt deleted
+- **Auth**: Email/password login, read-only by default
+- **Realtime**: Cross-device sync via postgres_changes subscription
+
+### CRUD Operations Pattern
+**CRITICAL**: All data operations are async and use direct Supabase calls:
+```javascript
+// Create/Update: await supabase.from('Prompt-Gallery').insert/update()
+// Read: await supabase.from('Prompt-Gallery').select()
+// Delete: await supabase.from('Prompt-Gallery').delete()
+// Always follow with: await loadItems() → renderGallery() → updateButtonVisibility()
+```
+- `saveItems()` function is **deprecated** - kept for backward compatibility but logs warning
+- Use `await loadItems()` to refresh from Supabase after any mutation
 
 ### Dual Form Pattern
-**CRITICAL**: Two separate forms exist for add and edit operations:
-- Add form (`addForm`) - for creating new items
-- Edit form (`editForm`) - for updating existing items with delete option
-- Both forms share identical structure but have separate IDs (`prompt`/`editPrompt`, `imageUrl`/`editImageUrl`, etc.)
+**CRITICAL**: Two separate modal forms exist for add and edit operations:
+- **Add form** (`#addFormModal`) - creates new items, multi-category selection
+- **Edit form** (`#editFormModal`) - updates existing items with delete button
+- Both forms share identical structure but have separate IDs:
+  - Prompts: `prompt` / `editPrompt`
+  - Image URLs: `imageUrl` / `editImageUrl`
+  - File inputs: `imageFile` / `editImageFile`
+  - Category arrays: `selectedCategories` / `selectedEditCategories`
+  - Upload type toggles: `setUploadType()` / `setEditUploadType()`
+  - Char counters: `updateCharCount()` / `updateEditCharCount()`
 - When modifying form logic, update BOTH forms to maintain feature parity
 - `editingId` global variable tracks which item is being edited
 
 ### Image Handling
 Two modes controlled by `uploadType`:
-1. **URL mode**: Direct image links (requires internet)
-2. **File mode**: Base64 encoding for offline storage (5MB limit)
+1. **URL mode**: Direct image links (external hosting)
+2. **File mode**: Upload to Supabase Storage (10MB limit, was 5MB for base64)
+   - Generates unique filename: `${Date.now()}-${Math.random()}.${ext}`
+   - Uploads to `prompt-images` bucket
+   - Returns public URL for storage in database
+   - Auto-deletes from Storage when prompt deleted
 
-Error handling includes fallback placeholders and size validation.
+Functions: `uploadImageToStorage(file)`, `deleteImageFromStorage(imageUrl)`
 
 ## Development Workflows
 
 ### Local Development
 ```bash
-# Method 1: Direct file opening
+# Method 1: Direct file opening (read-only, auth may not work)
 # Just double-click index.html
 
-# Method 2: HTTP server (recommended for file uploads)
+# Method 2: HTTP server (recommended for full functionality)
 python -m http.server 8000
 # Then open http://localhost:8000
 ```
 
-### Key Categories
-Hard-coded in multiple locations - must update all three:
-1. `index.html` - `<select id="category">` options (add form)
-2. `index.html` - `<select id="editCategory">` options (edit form)
+### Authentication Flow
+**Two-Tier Access Model**:
+- **Unauthenticated**: Can view and filter all prompts (read-only)
+- **Authenticated**: Can add, edit, delete prompts (full CRUD)
+
+```javascript
+// Auth state managed by currentUser global
+await checkAuthStatus(); // Called on DOMContentLoaded
+updateUIForAuth();       // Shows/hides buttons based on auth
+
+// Login/logout updates UI automatically
+currentUser = user;      // Set on successful login
+currentUser = null;      // Set on logout
+```
+
+Buttons visibility:
+- Always visible: Filter buttons, prompt cards
+- Auth-only: "New Item", "Import", "Export", card edit/delete buttons
+- Dynamic: "Login" (logged out) ↔ "Logout" (logged in)
+
+### Realtime Sync
+Cross-device synchronization via Supabase Realtime:
+```javascript
+supabase.channel('prompt-gallery-channel')
+    .on('postgres_changes', { event: '*', table: 'Prompt-Gallery' }, 
+        async (payload) => {
+            await loadItems();
+            renderGallery();
+            updateButtonVisibility();
+        })
+    .subscribe();
+```
+- Listens for INSERT, UPDATE, DELETE events
+- Auto-refreshes UI when changes occur from other devices/tabs
+- No manual polling needed
+
+### Categories Management
+**13 hard-coded categories** - must update in THREE locations:
+1. `index.html` - Add form category buttons (`#categoryButtons`)
+2. `index.html` - Edit form category buttons (`#editCategoryButtons`)  
 3. `index.html` - Filter bar buttons with `data-category` attributes
 
-Current categories: Nano, GPT, Midjourney, Video, Photorealistic, Casual, Anime
+Current: Nano, GPT, Midjourney, Video, Photo, real_ch, real_bg, US_ch, US_bg, JP_ch, JP_bg, etc, (All is special filter-only category)
+
+**Multi-select pattern**: 
+- Add form: `selectedCategories[]` array
+- Edit form: `selectedEditCategories[]` array
+- Visual feedback: Toggle `border-gray-400 bg-gray-200` classes
 
 ### Form Validation Pattern
 ```javascript
@@ -73,6 +143,17 @@ function showError(id, message) {
 }
 ```
 
+### Modal Management
+Three modals exist:
+1. **Add Form Modal** (`#addFormModal`) - backdrop click to close
+2. **Edit Form Modal** (`#editFormModal`) - backdrop click to close  
+3. **Login Modal** (`#loginModal`) - email/password form
+4. **Image Preview Modal** (`#imageModal`) - full-screen image viewer
+
+Pattern: `toggleForm()`, `closeEditForm()`, `toggleLoginModal()`, `closeImageModal()`
+- All set `document.body.style.overflow = 'hidden'` when open
+- Restore scroll on close
+
 ## Critical Conventions
 
 ### State Management
@@ -81,10 +162,10 @@ function showError(id, message) {
 - `renderGallery()` is the main render function - call after any data change
 
 ### Error Handling
-- Graceful localStorage failures
-- File size limits (5MB for uploads)
+- Graceful Supabase operation failures with try-catch
+- File size limits (10MB for uploads, was 5MB for base64)
 - URL validation for image links
-- Try-catch blocks around JSON operations
+- Auth errors displayed in modal
 
 ### CSS & Animations
 - Tailwind utility classes with custom animations in `<style>`
@@ -94,56 +175,69 @@ function showError(id, message) {
 
 ### Data Persistence
 ```javascript
-// Always call after modifying items array
-saveItems();
-renderGallery();
-updateButtonVisibility();
+// DEPRECATED - no longer call saveItems()
+// Instead, use direct Supabase operations:
+await supabase.from('Prompt-Gallery').insert/update/delete();
+await loadItems();      // Refresh from Supabase
+renderGallery();        // Re-render UI
+updateButtonVisibility(); // Update auth-dependent buttons
 ```
 
 ### CRUD Operation Flow
-1. **Add**: `addItem()` → validates → handles file/URL → `saveItemWithImage()` → `saveItems()` → `renderGallery()` → `toggleForm()`
-2. **Edit**: `editItem(id)` → populate form → show `editForm` → `updateItem()` → `saveUpdatedItem()` → `saveItems()`
+1. **Add**: `addItem()` → validates → handles file/URL → `saveItemWithImage()` → `supabase.insert()` → `loadItems()` → `renderGallery()`
+2. **Edit**: `editItem(id)` → populate form → show `editFormModal` → `updateItem()` → `supabase.update()` → `loadItems()`
 3. **Delete**: 
-   - From card: `deleteItem(id)` → confirm → filter array → `saveItems()`
-   - From edit form: `deleteCurrentItem()` → confirm → filter array → `closeEditForm()`
-4. **Read**: `loadItems()` on DOMContentLoaded → parse JSON → set global `items` array
+   - From card: `deleteItem(id)` → confirm → `deleteImageFromStorage()` → `supabase.delete()` → `loadItems()`
+   - From edit form: `deleteCurrentItem()` → confirm → `deleteImageFromStorage()` → `supabase.delete()` → `closeEditForm()`
+4. **Read**: `loadItems()` on DOMContentLoaded → `supabase.select()` → set global `items` array → `renderGallery()`
 
 ## File Modification Guidelines
 
 ### Adding Features
-- Extend global state variables at top of `js/app.js`
-- Add HTML structure to `index.html`
-- Test localStorage quota handling
+- Extend global state variables at top of [js/app.js](js/app.js)
+- Add HTML structure to [index.html](index.html)
+- Test Supabase RLS policies if changing data model
+- Update both add and edit forms if adding new fields
 
 ### UI Changes
-- Modify Tailwind classes in `index.html`
-- Custom styles go in `css/style.css`
+- Modify Tailwind classes in [index.html](index.html)
+- Custom styles go in [css/style.css](css/style.css)
 - Maintain responsive breakpoints (`md:`, `lg:` prefixes)
 
 ### Data Structure Changes
-- Update both save/load functions in `js/app.js`
-- Consider backwards compatibility for existing localStorage data
-- Test JSON export/import functionality
+- Update Supabase table schema (requires database migration)
+- Modify both add/edit form handlers in [js/app.js](js/app.js)
+- Test JSON export/import functionality for backward compatibility
 - JSON backups can be saved in `data/` directory (user-managed)
 
 ## Integration Points
 
 ### External Dependencies
-- Tailwind CSS (CDN) - no local compilation
-- Google Fonts (Inter) for typography
-- Browser APIs: localStorage, FileReader, Clipboard API
+- **Supabase JS SDK** (CDN v2) - PostgreSQL + Storage + Auth + Realtime
+- **Tailwind CSS** (CDN) - no local compilation
+- **Google Fonts** (Inter) for typography
+- Browser APIs: FileReader, Clipboard API
+
+### Supabase Configuration
+Located in [js/supabase-config.js](js/supabase-config.js):
+```javascript
+const SUPABASE_URL = 'https://[project-ref].supabase.co';
+const SUPABASE_ANON_KEY = '[anon-key]';
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+```
 
 ### Browser Compatibility
 Requires modern browser features:
-- localStorage (IE8+)
+- Async/await (Chrome 55+, Firefox 52+)
 - FileReader API (IE10+)
 - Clipboard API (Chrome 66+, Firefox 63+)
 
 ### Deployment
 Static hosting ready:
 - GitHub Pages, Netlify, Vercel
-- No server-side processing required
+- Requires Supabase project setup
 - All assets self-contained except CDN links
+- Environment: `SUPABASE_URL` and `SUPABASE_ANON_KEY` must be configured
 
 ## Common Pitfalls & Solutions
 
@@ -173,9 +267,14 @@ function escapeHtml(text) {
 ```
 Used in `createItemCard()` for prompts and image URLs.
 
-### localStorage Quota Management
-5MB limit handling:
-- Catch `QuotaExceededError` in `saveItems()`
-- Alert user to export and clear data
-- Base64 images increase size ~33% vs original file
-- Consider warning at 80% capacity (not currently implemented)
+### Supabase Storage Management
+- Images stored in `prompt-images` bucket (10MB limit per file)
+- Public bucket - no auth required to view images
+- Always delete images when deleting prompts to avoid orphaned files
+- Extract file path from URL pattern: `split('/prompt-images/')[1]`
+
+### Authentication Edge Cases
+- UI updates on auth state change via `updateUIForAuth()`
+- Check `currentUser !== null` before write operations
+- RLS policies enforced server-side (client validation is UX only)
+- Login errors displayed in modal, not as alerts

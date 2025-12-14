@@ -786,8 +786,9 @@ function attachImageClickListeners() {
     imageContainers.forEach(container => {
         container.addEventListener('click', function() {
             const imageUrl = this.getAttribute('data-image-url');
-            if (imageUrl) {
-                openImageModal(imageUrl);
+            const itemId = this.getAttribute('data-item-id');
+            if (imageUrl && itemId) {
+                openImageModal(imageUrl, itemId);
             }
         });
     });
@@ -796,7 +797,7 @@ function attachImageClickListeners() {
 function createItemCard(item) {
     // Image HTML with fallback - add click handler class and data attribute
     const imageHtml = item.image 
-        ? '<div class=\"gallery-image-container w-full h-full cursor-pointer absolute inset-0\" data-image-url=\"' + escapeHtml(item.image) + '\">' +
+        ? '<div class=\"gallery-image-container w-full h-full cursor-pointer absolute inset-0\" data-image-url=\"' + escapeHtml(item.image) + '\" data-item-id=\"' + item.id + '\">' +
           '<img src=\"' + escapeHtml(item.image) + '\" alt=\"Prompt image\" class=\"w-full h-full object-cover\" onerror=\"this.style.display=\'none\';\">' +
           '</div>'
         : '<div class=\"w-full h-full bg-gray-100 flex items-center justify-center absolute inset-0\"><svg class=\"w-12 h-12 text-gray-400\" fill=\"none\" stroke=\"currentColor\" viewBox=\"0 0 24 24\"><path stroke-linecap=\"round\" stroke-linejoin=\"round\" stroke-width=\"2\" d=\"M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z\"></path></svg></div>';
@@ -1045,12 +1046,39 @@ async function logout() {
 }
 
 // Image modal functions
-function openImageModal(imageUrl) {
+let currentModalItemId = null;
+
+function openImageModal(imageUrl, itemId) {
     const modal = document.getElementById('imageModal');
     const modalImage = document.getElementById('modalImage');
+    const modalPromptText = document.getElementById('modalPromptText');
+    const modalSrefText = document.getElementById('modalSrefText');
+    const modalSrefSection = document.getElementById('modalSrefSection');
     
-    if (modal && modalImage && imageUrl) {
+    if (modal && modalImage && imageUrl && itemId) {
+        // Find the item
+        const item = items.find(i => i.id == itemId);
+        if (!item) return;
+        
+        // Store current item ID for copy functions
+        currentModalItemId = itemId;
+        
+        // Set image
         modalImage.src = imageUrl;
+        
+        // Set prompt text
+        if (modalPromptText) {
+            modalPromptText.textContent = item.prompt || 'No prompt available';
+        }
+        
+        // Set sref text if exists
+        if (item.sref && modalSrefText && modalSrefSection) {
+            modalSrefText.textContent = item.sref;
+            modalSrefSection.classList.remove('hidden');
+        } else if (modalSrefSection) {
+            modalSrefSection.classList.add('hidden');
+        }
+        
         modal.classList.remove('hidden');
         document.body.style.overflow = 'hidden';
     }
@@ -1063,6 +1091,94 @@ function closeImageModal() {
     if (modal && modalImage) {
         modal.classList.add('hidden');
         modalImage.src = '';
+        currentModalItemId = null;
         document.body.style.overflow = '';
+    }
+}
+
+function copyModalPrompt() {
+    if (!currentModalItemId) return;
+    
+    const item = items.find(i => i.id == currentModalItemId);
+    if (item && item.prompt) {
+        navigator.clipboard.writeText(item.prompt).then(() => {
+            showCopyFeedback('Prompt copied!');
+        }).catch(err => {
+            console.error('Failed to copy prompt:', err);
+            alert('Failed to copy to clipboard');
+        });
+    }
+}
+
+function copyModalSref() {
+    if (!currentModalItemId) return;
+    
+    const item = items.find(i => i.id == currentModalItemId);
+    if (item && item.sref) {
+        navigator.clipboard.writeText(item.sref).then(() => {
+            showCopyFeedback('_sref copied!');
+        }).catch(err => {
+            console.error('Failed to copy sref:', err);
+            alert('Failed to copy to clipboard');
+        });
+    }
+}
+
+function showCopyFeedback(message) {
+    // Create temporary feedback element
+    const feedback = document.createElement('div');
+    feedback.textContent = message;
+    feedback.className = 'fixed top-20 left-1/2 transform -translate-x-1/2 bg-gray-900 text-white px-6 py-3 rounded-lg shadow-lg z-[60] transition-opacity';
+    document.body.appendChild(feedback);
+    
+    // Remove after 2 seconds
+    setTimeout(() => {
+        feedback.style.opacity = '0';
+        setTimeout(() => {
+            document.body.removeChild(feedback);
+        }, 300);
+    }, 2000);
+}
+
+async function translateModalPrompt() {
+    if (!currentModalItemId) return;
+    
+    const item = items.find(i => i.id == currentModalItemId);
+    if (!item || !item.prompt) return;
+    
+    const translationSection = document.getElementById('modalTranslationSection');
+    const translationText = document.getElementById('modalTranslationText');
+    const translateBtn = document.getElementById('translateBtn');
+    
+    if (!translationSection || !translationText) return;
+    
+    // Show loading state
+    if (translateBtn) {
+        translateBtn.disabled = true;
+        translateBtn.innerHTML = '<svg class="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg> 번역중...';
+    }
+    
+    try {
+        // Use MyMemory Translation API (free, no API key required)
+        const text = encodeURIComponent(item.prompt);
+        const response = await fetch(`https://api.mymemory.translated.net/get?q=${text}&langpair=en|ko`);
+        const data = await response.json();
+        
+        if (data.responseStatus === 200 && data.responseData.translatedText) {
+            translationText.textContent = data.responseData.translatedText;
+            translationSection.classList.remove('hidden');
+        } else {
+            throw new Error('Translation failed');
+        }
+    } catch (error) {
+        console.error('Translation error:', error);
+        translationText.textContent = '번역에 실패했습니다. 다시 시도해주세요.';
+        translationSection.classList.remove('hidden');
+    } finally {
+        // Restore button
+        if (translateBtn) {
+            translateBtn.disabled = false;
+            translateBtn.innerHTML = '<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"></path></svg> 번역';
+        }
     }
 }

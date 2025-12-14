@@ -282,9 +282,50 @@
     <!-- Image Preview Modal -->
     <div id="imageModal" class="fixed inset-0 bg-black bg-opacity-90 z-50 hidden">
         <div class="w-full h-full flex items-center justify-center p-4" onclick="closeImageModal()">
-            <div class="relative max-w-7xl max-h-screen">
-                <button onclick="closeImageModal()" class="absolute -top-12 right-0 text-white hover:text-gray-300 text-4xl font-light">×</button>
-                <img id="modalImage" src="" alt="Preview" class="max-w-full max-h-screen object-contain rounded-lg shadow-2xl" onclick="event.stopPropagation()">
+            <div class="relative max-w-7xl w-full flex flex-col items-center" onclick="event.stopPropagation()">
+                <button onclick="closeImageModal()" class="absolute -top-12 right-0 text-white hover:text-gray-300 text-4xl font-light z-10">×</button>
+                <img id="modalImage" src="" alt="Preview" class="max-w-full max-h-[70vh] object-contain rounded-lg shadow-2xl mb-6">
+                
+                <!-- Prompt Content -->
+                <div class="bg-white rounded-lg shadow-xl p-6 max-w-4xl w-full" onclick="event.stopPropagation()">
+                    <div class="flex justify-between items-start mb-4">
+                        <h3 class="text-lg font-semibold text-gray-900">Prompt</h3>
+                        <div class="flex gap-2">
+                            <button onclick="translateModalPrompt()" id="translateBtn" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-blue-700 transition-all flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"></path>
+                                </svg>
+                                번역
+                            </button>
+                            <button onclick="copyModalPrompt()" class="bg-gray-900 text-white px-4 py-2 rounded-lg text-sm font-medium hover:bg-gray-800 transition-all flex items-center gap-2">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z"></path>
+                                </svg>
+                                Copy
+                            </button>
+                        </div>
+                    </div>
+                    <p id="modalPromptText" class="text-gray-700 whitespace-pre-wrap leading-relaxed"></p>
+                    
+                    <!-- Korean Translation section -->
+                    <div id="modalTranslationSection" class="mt-4 pt-4 border-t border-gray-200 hidden">
+                        <div class="flex justify-between items-start mb-2">
+                            <h4 class="text-sm font-semibold text-gray-900">한글 번역</h4>
+                        </div>
+                        <p id="modalTranslationText" class="text-gray-600 whitespace-pre-wrap leading-relaxed"></p>
+                    </div>
+                    
+                    <!-- Sref section (if exists) -->
+                    <div id="modalSrefSection" class="mt-4 pt-4 border-t border-gray-200 hidden">
+                        <div class="flex justify-between items-start mb-2">
+                            <h4 class="text-sm font-semibold text-gray-900">_sref</h4>
+                            <button onclick="copyModalSref()" class="bg-gray-600 text-white px-3 py-1.5 rounded text-xs font-medium hover:bg-gray-700 transition-all">
+                                Copy
+                            </button>
+                        </div>
+                        <p id="modalSrefText" class="text-gray-600 text-sm font-mono"></p>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
