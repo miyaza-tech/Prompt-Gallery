@@ -1159,20 +1159,27 @@ async function translateModalPrompt() {
     }
     
     try {
-        // Use MyMemory Translation API (free, no API key required)
+        // Use Google Translate API via translate.googleapis.com (free, no auth required for simple requests)
         const text = encodeURIComponent(item.prompt);
-        const response = await fetch(`https://api.mymemory.translated.net/get?q=${text}&langpair=en|ko`);
+        const response = await fetch(`https://translate.googleapis.com/translate_a/single?client=gtx&sl=en&tl=ko&dt=t&q=${text}`);
+        
+        if (!response.ok) {
+            throw new Error('Translation API request failed');
+        }
+        
         const data = await response.json();
         
-        if (data.responseStatus === 200 && data.responseData.translatedText) {
-            translationText.textContent = data.responseData.translatedText;
+        // Google Translate API returns array format
+        if (data && data[0] && data[0].length > 0) {
+            const translatedText = data[0].map(item => item[0]).join('');
+            translationText.textContent = translatedText;
             translationSection.classList.remove('hidden');
         } else {
-            throw new Error('Translation failed');
+            throw new Error('Translation failed - no data');
         }
     } catch (error) {
         console.error('Translation error:', error);
-        translationText.textContent = '번역에 실패했습니다. 다시 시도해주세요.';
+        translationText.textContent = '번역에 실패했습니다. 다시 시도해주세요.\n(' + error.message + ')';
         translationSection.classList.remove('hidden');
     } finally {
         // Restore button
