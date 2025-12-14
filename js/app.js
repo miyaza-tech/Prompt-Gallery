@@ -1054,6 +1054,8 @@ function openImageModal(imageUrl, itemId) {
     const modalPromptText = document.getElementById('modalPromptText');
     const modalSrefText = document.getElementById('modalSrefText');
     const modalSrefSection = document.getElementById('modalSrefSection');
+    const modalTranslationSection = document.getElementById('modalTranslationSection');
+    const modalTranslationText = document.getElementById('modalTranslationText');
     
     if (modal && modalImage && imageUrl && itemId) {
         // Find the item
@@ -1077,6 +1079,14 @@ function openImageModal(imageUrl, itemId) {
             modalSrefSection.classList.remove('hidden');
         } else if (modalSrefSection) {
             modalSrefSection.classList.add('hidden');
+        }
+        
+        // Reset translation section (hide and clear previous translation)
+        if (modalTranslationSection) {
+            modalTranslationSection.classList.add('hidden');
+        }
+        if (modalTranslationText) {
+            modalTranslationText.textContent = '';
         }
         
         modal.classList.remove('hidden');
