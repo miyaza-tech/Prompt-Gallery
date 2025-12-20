@@ -23,7 +23,8 @@ AI 이미지 생성 프롬프트를 수집하고 관리하는 웹 애플리케�
 
 ### 보안 & 권한
 - **Row Level Security (RLS)**: 읽기는 모두, 쓰기는 인증된 사용자만
-- **로그인 시스템**: Supabase Authentication 연동
+- **관리자 로그인**: 간단한 비밀번호 인증 (localStorage 기반)
+- **로그인 필수**: 로그인해야만 프롬프트 보기 가능
 - **자동 이미지 관리**: 프롬프트 삭제 시 Storage 이미지도 자동 삭제
 
 ### UI/UX
@@ -37,8 +38,8 @@ AI 이미지 생성 프롬프트를 수집하고 관리하는 웹 애플리케�
 ### 온라인 사용 (권장)
 **https://miyaza-tech.github.io/Prompt-Gallery/**
 
-- 읽기 전용: 로그인 없이 프롬프트 보기 및 복사 가능
-- 편집 권한: 관리자만 로그인하여 추가/수정/삭제 가능
+- **로그인 필수**: 관리자 비밀번호로 로그인해야 프롬프트 확인 가능
+- **편집 권한**: 로그인 후 추가/수정/삭제 가능
 
 ### 로컬 개발
 ```bash
@@ -76,28 +77,28 @@ prompt-gallery/
 ### Backend (Supabase)
 - **Database**: PostgreSQL (Prompt-Gallery 테이블)
 - **Storage**: 이미지 파일 저장 (prompt-images 버킷)
-- **Authentication**: Email/Password 로그인
+- **Authentication**: 간단한 관리자 비밀번호 (localStorage 기반)
 - **Realtime**: 실시간 데이터 동기화
 
 ## 📝 사용 방법
 
-### 일반 사용자 (로그인 불필요)
-1. **프롬프트 보기**: 갤러리에서 모든 프롬프트 확인
-2. **필터링**: 상단 카테고리 버튼으로 다중 필터 (여러 개 동시 선택 가능)
-3. **복사**: 카드 호버 → "_sref" 또는 "prompt" 버튼 클릭
-
 ### 관리자 (로그인 필요)
 1. **로그인**: 우측 상단 "Login" 버튼
-2. **새 항목 추가**: "New Item" 버튼 클릭
+   - 관리자 비밀번호 입력 (기본값: 코드에 설정됨)
+   - localStorage에 세션 저장
+2. **프롬프트 보기**: 로그인 후 모든 프롬프트 확인
+3. **필터링**: 상단 카테고리 버튼으로 다중 필터 (여러 개 동시 선택 가능)
+4. **복사**: 카드 호버 → "_sref" 또는 "prompt" 버튼 클릭
+5. **새 항목 추가**: "New Item" 버튼 클릭
    - **이미지 선택**:
      - URL: 외부 이미지 링크 입력
      - File: 로컬 파일 업로드 (최대 10MB, Supabase Storage 자동 업로드)
    - **카테고리 선택**: 버튼 형태로 여러 개 선택 가능 (회색 배경 = 선택됨)
    - **프롬프트 입력**: 최대 1000자
    - **_sref 입력**: 스타일 참조 코드
-3. **수정/삭제**: 카드 호버 → "edit" 버튼
-4. **백업**: "Export" → JSON 다운로드
-5. **복원**: "Import" → JSON 업로드
+6. **수정/삭제**: 카드 호버 → "edit" 버튼
+7. **백업**: "Export" → JSON 다운로드
+8. **복원**: "Import" → JSON 업로드
 
 ## 🎯 주요 특징
 
@@ -117,7 +118,8 @@ prompt-gallery/
 - **Row Level Security (RLS)**: 
   - SELECT: 누구나 읽기 가능
   - INSERT/UPDATE/DELETE: 인증된 사용자만
-- **인증 시스템**: Supabase Authentication
+- **관리자 인증**: localStorage 기반 간단한 비밀번호 로그인
+- **로그인 필수**: 로그인하지 않으면 데이터 표시 안 됨
 - **UI 권한 제어**: 로그인 상태에 따라 버튼 표시/숨김
 
 ### 다중 카테고리
@@ -199,10 +201,14 @@ ON storage.objects FOR DELETE
 USING (bucket_id = 'prompt-images' AND auth.uid() IS NOT NULL);
 ```
 
-### 5. Authentication 설정
-1. Authentication → Providers → Email 활성화
-2. Enable Email provider 켜기
-3. Authentication → Users → Add User로 관리자 계정 생성
+### 5. 관리자 비밀번호 설정
+`js/app.js` 파일에서 비밀번호 변경:
+```javascript
+// login() 함수 내부
+const ADMIN_PASSWORD = '7585';  // 원하는 비밀번호로 변경
+```
+
+**참고**: Supabase Authentication은 사용하지 않지만, RLS 정책은 여전히 유효합니다. 데이터 읽기는 누구나 가능하나, UI에서 로그인을 요구합니다.
 
 ## 📦 배포
 
@@ -255,8 +261,9 @@ if (file.size > 10 * 1024 * 1024) { // 10MB
 - Storage Policies가 올바르게 설정되었는지 확인
 
 ### 로그인이 안 돼요
-- Authentication Email Provider가 활성화되었는지 확인
-- 계정이 생성되었는지 확인 (Authentication → Users)
+- `js/app.js`에서 올바른 관리자 비밀번호를 확인하세요
+- localStorage가 활성화되어 있는지 확인 (시크릿 모드에서는 작동 안 함)
+- 브라우저 콘솔에서 에러 메시지 확인
 
 ### 추가/수정/삭제가 안 돼요
 - 로그인했는지 확인
