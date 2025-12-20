@@ -10,10 +10,12 @@ let currentUser = null;
 // Initialize on page load
 document.addEventListener('DOMContentLoaded', async function() {
     await checkAuthStatus();
-    await loadItems();
+    if (currentUser) {
+        await loadItems();
+        subscribeToRealtime();
+    }
     renderGallery();
     updateButtonVisibility();
-    subscribeToRealtime();
 });
 
 // Supabase Database persistence
@@ -753,6 +755,17 @@ function renderGallery() {
     
     if (!gallery || !count) return;
     
+    // 로그인하지 않은 경우 로그인 안내 메시지 표시
+    if (!currentUser) {
+        gallery.innerHTML = '<div class="col-span-full text-center py-24">' +
+            '<h3 class="text-2xl font-light text-gray-900 mb-4">Login Required</h3>' +
+            '<p class="text-gray-500 mb-6">관리자 로그인이 필요합니다</p>' +
+            '<button onclick="toggleLoginModal()" class="bg-blue-600 text-white px-6 py-3 rounded-lg text-sm font-medium hover:bg-blue-700 transition-all">Login</button>' +
+            '</div>';
+        count.textContent = '0';
+        return;
+    }
+    
     // Filter items - check if item has any of the active filters
     const filteredItems = activeFilters.length === 0
         ? items 
@@ -937,20 +950,15 @@ function subscribeToRealtime() {
 
 // Authentication functions
 async function checkAuthStatus() {
-    try {
-        const { data: { user } } = await supabase.auth.getUser();
-        currentUser = user;
-        updateUIForAuth();
-        
-        if (user) {
-            console.log('✅ Logged in as:', user.email);
-        } else {
-            console.log('ℹ️ Not logged in - read-only mode');
-        }
-    } catch (error) {
-        console.error('Error checking auth status:', error);
-        currentUser = null;
-        updateUIForAuth();
+    // Check localStorage for admin session
+    const isLoggedIn = localStorage.getItem('adminLoggedIn') === 'true';
+    currentUser = isLoggedIn ? { email: 'admin' } : null;
+    updateUIForAuth();
+    
+    if (isLoggedIn) {
+        console.log('✅ Logged in as admin');
+    } else {
+        console.log('ℹ️ Not logged in - read-only mode');
     }
 }
 
@@ -990,58 +998,50 @@ function toggleLoginModal() {
         modal.classList.add('hidden');
         document.body.style.overflow = '';
         // Clear form
-        document.getElementById('loginEmail').value = '';
         document.getElementById('loginPassword').value = '';
         document.getElementById('loginError').classList.add('hidden');
     }
 }
 
 async function login() {
-    const email = document.getElementById('loginEmail').value.trim();
     const password = document.getElementById('loginPassword').value;
     const errorEl = document.getElementById('loginError');
     
-    if (!email || !password) {
-        errorEl.textContent = 'Please enter email and password';
+    if (!password) {
+        errorEl.textContent = 'Please enter password';
         errorEl.classList.remove('hidden');
         return;
     }
     
-    try {
-        const { data, error } = await supabase.auth.signInWithPassword({
-            email: email,
-            password: password
-        });
-        
-        if (error) throw error;
-        
-        currentUser = data.user;
-        console.log('✅ Login successful:', currentUser.email);
+    // 관리자 비밀번호 확인 (원하는 비밀번호로 변경하세요)
+    const ADMIN_PASSWORD = '7585';
+    
+    if (password === ADMIN_PASSWORD) {
+        localStorage.setItem('adminLoggedIn', 'true');
+        currentUser = { email: 'admin' };
+        console.log('✅ Login successful');
         
         toggleLoginModal();
+        
+        // 로그인 후 데이터 로드 및 실시간 동기화 시작
+        await loadItems();
+        subscribeToRealtime();
+        
         updateUIForAuth();
         alert('Login successful!');
-    } catch (error) {
-        console.error('Login error:', error);
-        errorEl.textContent = error.message || 'Login failed';
+    } else {
+        errorEl.textContent = 'Incorrect password';
         errorEl.classList.remove('hidden');
     }
 }
 
 async function logout() {
     if (confirm('Logout?')) {
-        try {
-            const { error } = await supabase.auth.signOut();
-            if (error) throw error;
-            
-            currentUser = null;
-            console.log('✅ Logged out');
-            updateUIForAuth();
-            alert('Logged out successfully');
-        } catch (error) {
-            console.error('Logout error:', error);
-            alert('Logout failed: ' + error.message);
-        }
+        localStorage.removeItem('adminLoggedIn');
+        currentUser = null;
+        console.log('✅ Logged out');
+        updateUIForAuth();
+        alert('Logged out successfully');
     }
 }
 
