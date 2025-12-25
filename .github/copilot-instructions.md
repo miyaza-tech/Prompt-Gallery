@@ -83,29 +83,30 @@ python -m http.server 8000
 # Just double-click index.html
 ```
 
-### Authentication Flow (localStorage-based)
-**Admin password**: Hardcoded in `login()` as `ADMIN_PASSWORD = '7585'`
+### Authentication Flow (Supabase Auth)
+**Login mechanism**: Uses Supabase email/password authentication
 ```javascript
 // On page load
-await checkAuthStatus(); // Reads localStorage.getItem('adminLoggedIn')
+await checkAuthStatus(); // Calls supabase.auth.getSession()
 if (currentUser) {
     await loadItems();
     subscribeToRealtime();
 }
 
 // Login
-localStorage.setItem('adminLoggedIn', 'true');
-currentUser = { email: 'admin' };
+const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+currentUser = data.user;
 updateUIForAuth(); // Shows/hides buttons
 
 // Logout
-localStorage.removeItem('adminLoggedIn');
+await supabase.auth.signOut();
 currentUser = null;
 ```
 
 **UI visibility rules**:
-- Unauthenticated: Only filter + card copy buttons
-- Authenticated: + "New Item", "Import", "Export", card "edit" buttons
+- Unauthenticated: Login required message + login button
+- Authenticated: Full gallery + "New Item", "Import", "Export", card "edit" buttons
+- **Critical**: Gallery hidden until login - `renderGallery()` shows "Login Required" message when `currentUser === null`
 
 ### Realtime Cross-Device Sync
 ```javascript
@@ -269,7 +270,7 @@ const SUPABASE_URL = 'https://uhwnbjmfcakbkbxvhpgx.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbG...'; // Public key (safe for client-side)
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 ```
-**RLS protects writes** - anon key only allows reads by default.
+**RLS protects writes** - uses Supabase Auth tokens. Authenticated users can write; unauthenticated users are read-only (SELECT allowed).
 
 ### Translation Feature (Image Modal)
 Uses **Google Translate API** (free, no auth):
@@ -307,8 +308,9 @@ await supabase.from('Prompt-Gallery').delete().eq('id', id);
 ### Supabase RLS Blocks Writes
 **Problem**: Authenticated user can't insert/update.
 **Solution**: 
-- Check if `auth.uid() IS NOT NULL` policy exists.
-- **This app uses localStorage auth**, not Supabase Auth - RLS may need manual bypass or service role key for writes.
+- Verify `auth.uid() IS NOT NULL` policy exists in Supabase dashboard
+- **This app uses Supabase Auth** - ensure user is properly authenticated via `supabase.auth.signInWithPassword()`
+- Check browser console for authentication errors and verify `currentUser` is set after login
 
 ### Image Preview Not Showing
 **Problem**: FileReader preview shows but card doesn't.

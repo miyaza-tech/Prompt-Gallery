@@ -280,14 +280,14 @@
     </div>
 
     <!-- Image Preview Modal -->
-    <div id="imageModal" class="fixed inset-0 bg-black bg-opacity-90 z-50 hidden">
-        <div class="w-full h-full flex items-center justify-center p-4" onclick="closeImageModal()">
-            <div class="relative max-w-7xl w-full flex flex-col items-center" onclick="event.stopPropagation()">
-                <button onclick="closeImageModal()" class="absolute -top-12 right-0 text-white hover:text-gray-300 text-4xl font-light z-10">×</button>
-                <img id="modalImage" src="" alt="Preview" class="max-w-full max-h-[70vh] object-contain rounded-lg shadow-2xl mb-6">
+    <div id="imageModal" class="fixed inset-0 bg-black bg-opacity-90 z-50 hidden overflow-y-auto">
+        <div class="min-h-full flex items-center justify-center p-4" onclick="closeImageModal()">
+            <div class="relative max-w-7xl w-full flex flex-col items-center my-8" onclick="event.stopPropagation()">
+                <button onclick="closeImageModal()" class="sticky top-0 self-end mb-4 text-white hover:text-gray-300 text-4xl font-light z-10">×</button>
+                <img id="modalImage" src="" alt="Preview" class="max-w-full max-h-[60vh] object-contain rounded-lg shadow-2xl mb-6">
                 
                 <!-- Prompt Content -->
-                <div class="bg-white rounded-lg shadow-xl p-6 max-w-4xl w-full" onclick="event.stopPropagation()">
+                <div class="bg-white rounded-lg shadow-xl p-6 max-w-4xl w-full max-h-[50vh] overflow-y-auto" onclick="event.stopPropagation()">
                     <div class="flex justify-between items-start mb-4">
                         <h3 class="text-lg font-semibold text-gray-900">Prompt</h3>
                         <div class="flex gap-2">
