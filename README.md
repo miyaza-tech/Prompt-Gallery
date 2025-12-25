@@ -22,8 +22,8 @@ AI 이미지 생성 프롬프트를 수집하고 관리하는 웹 애플리케�
 - **클립보드 복사**: 프롬프트 및 _sref 원클릭 복사
 
 ### 보안 & 권한
-- **Row Level Security (RLS)**: 읽기는 모두, 쓰기는 인증된 사용자만
-- **관리자 로그인**: 간단한 비밀번호 인증 (localStorage 기반)
+- **Row Level Security (RLS)**: 인증된 사용자만 읽기/쓰기 가능
+- **Supabase Authentication**: 이메일/비밀번호 인증
 - **로그인 필수**: 로그인해야만 프롬프트 보기 가능
 - **자동 이미지 관리**: 프롬프트 삭제 시 Storage 이미지도 자동 삭제
 
@@ -116,9 +116,8 @@ prompt-gallery/
 
 ### 보안 시스템
 - **Row Level Security (RLS)**: 
-  - SELECT: 누구나 읽기 가능
-  - INSERT/UPDATE/DELETE: 인증된 사용자만
-- **관리자 인증**: localStorage 기반 간단한 비밀번호 로그인
+  - SELECT/INSERT/UPDATE/DELETE: 인증된 사용자만 가능
+- **Supabase Authentication**: 이메일/비밀번호 기반 인증
 - **로그인 필수**: 로그인하지 않으면 데이터 표시 안 됨
 - **UI 권한 제어**: 로그인 상태에 따라 버튼 표시/숨김
 
@@ -162,12 +161,12 @@ CREATE TABLE "Prompt-Gallery" (
 ```sql
 ALTER TABLE "Prompt-Gallery" ENABLE ROW LEVEL SECURITY;
 
--- 읽기는 모두 가능
-CREATE POLICY "Anyone can read prompts"
+-- 인증된 사용자만 읽기 가능
+CREATE POLICY "Authenticated users can read prompts"
 ON "Prompt-Gallery" FOR SELECT
-USING (true);
+USING (auth.uid() IS NOT NULL);
 
--- 쓰기는 인증된 사용자만
+-- 인증된 사용자만 쓰기 가능
 CREATE POLICY "Only authenticated users can insert"
 ON "Prompt-Gallery" FOR INSERT
 WITH CHECK (auth.uid() IS NOT NULL);
@@ -185,10 +184,10 @@ USING (auth.uid() IS NOT NULL);
 1. Storage → New bucket → `prompt-images` (Public)
 2. Policies 설정:
 ```sql
--- 읽기는 모두 가능
-CREATE POLICY "Public read access"
+-- 인증된 사용자만 읽기 가능
+CREATE POLICY "Authenticated users can read"
 ON storage.objects FOR SELECT
-USING (bucket_id = 'prompt-images');
+USING (bucket_id = 'prompt-images' AND auth.uid() IS NOT NULL);
 
 -- 업로드는 인증된 사용자만
 CREATE POLICY "Authenticated users can upload"
