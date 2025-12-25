@@ -15,8 +15,8 @@ AI 이미지 생성 프롬프트를 수집하고 관리하는 웹 애플리케�
 - **JSON 백업/복원**: 데이터 내보내기 및 가져오기
 
 ### 프롬프트 관리
-- **다중 카테고리 선택**: Nano, GPT, Midjourney, Video, Photo, real_ch, real_bg, US_ch, US_bg, JP_ch, JP_bg, etc (12개 카테고리)
-- **다중 필터**: 여러 카테고리 동시 필터링 (OR 조건)
+- **다중 카테고리 선택**: Nano, GPT, Midjourney, Photo, real_ch, real_bg, US_ch, US_bg, JP_ch, JP_bg, etc (11개 카테고리)
+- **단일 필터**: 한 번에 하나의 카테고리만 필터링
 - **_sref 필드**: 스타일 참조 코드 저장
 - **이미지 지원**: URL 또는 파일 업로드 (Supabase Storage 통합)
 - **클립보드 복사**: 프롬프트 및 _sref 원클릭 복사
@@ -87,7 +87,7 @@ prompt-gallery/
    - 관리자 비밀번호 입력 (기본값: 코드에 설정됨)
    - localStorage에 세션 저장
 2. **프롬프트 보기**: 로그인 후 모든 프롬프트 확인
-3. **필터링**: 상단 카테고리 버튼으로 다중 필터 (여러 개 동시 선택 가능)
+3. **필터링**: 상단 카테고리 버튼으로 단일 필터 (한 번에 하나만 선택 가능)
 4. **복사**: 카드 호버 → "_sref" 또는 "prompt" 버튼 클릭
 5. **새 항목 추가**: "New Item" 버튼 클릭
    - **이미지 선택**:
@@ -201,14 +201,15 @@ ON storage.objects FOR DELETE
 USING (bucket_id = 'prompt-images' AND auth.uid() IS NOT NULL);
 ```
 
-### 5. 관리자 비밀번호 설정
-`js/app.js` 파일에서 비밀번호 변경:
-```javascript
-// login() 함수 내부
-const ADMIN_PASSWORD = '7585';  // 원하는 비밀번호로 변경
+### 5. Supabase Authentication 설정
+1. Authentication → Settings → Email Auth 활성화
+2. 관리자 계정 생성 (Email/Password)
+3. `index.html`에서 이메일 기본값 수정 (선택사항):
+```html
+<input type="email" id="loginEmail" value="your@email.com">
 ```
 
-**참고**: Supabase Authentication은 사용하지 않지만, RLS 정책은 여전히 유효합니다. 데이터 읽기는 누구나 가능하나, UI에서 로그인을 요구합니다.
+**참고**: Supabase Auth를 사용하여 RLS 정책이 자동으로 작동합니다. 인증된 사용자만 데이터를 추가/수정/삭제할 수 있습니다.
 
 ## 📦 배포
 
