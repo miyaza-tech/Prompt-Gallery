@@ -3,8 +3,8 @@ let items = [];
 let currentFilter = 'All';
 let uploadType = 'url';
 let editingId = null;
-let selectedCategories = [];
-let selectedEditCategories = [];
+let selectedCategories = []; // Multiple selection for forms
+let selectedEditCategories = []; // Multiple selection for forms
 let currentUser = null;
 
 // Initialize on page load
@@ -73,7 +73,7 @@ function closeModalOnBackdrop(event, modalId) {
     }
 }
 
-// Category selection
+// Category selection for forms (multiple selection)
 function toggleCategory(category) {
     const index = selectedCategories.indexOf(category);
     const button = document.querySelector(`[data-category="${category}"].category-btn`);
@@ -709,40 +709,21 @@ function handleFileUpload(event) {
 let activeFilters = [];
 
 function filterItems(category) {
-    if (category === 'All') {
-        // Clear all filters
-        activeFilters = [];
-        const buttons = document.querySelectorAll('.filter-btn');
-        buttons.forEach(btn => {
-            const cat = btn.getAttribute('data-category');
-            if (cat === 'All') {
-                btn.className = 'filter-btn bg-gray-900 text-white px-5 py-2 rounded-lg text-sm font-medium transition-all';
-            } else {
-                btn.className = 'filter-btn text-gray-600 hover:text-gray-900 px-5 py-2 rounded-lg text-sm font-medium transition-all';
-            }
-        });
-    } else {
-        const index = activeFilters.indexOf(category);
-        const button = document.querySelector(`.filter-btn[data-category="${category}"]`);
-        const allButton = document.querySelector('.filter-btn[data-category="All"]');
-        
-        if (index > -1) {
-            // Remove filter
-            activeFilters.splice(index, 1);
-            button.className = 'filter-btn text-gray-600 hover:text-gray-900 px-5 py-2 rounded-lg text-sm font-medium transition-all';
-            
-            // If no filters, activate All
-            if (activeFilters.length === 0) {
-                allButton.className = 'filter-btn bg-gray-900 text-white px-5 py-2 rounded-lg text-sm font-medium transition-all';
-            }
+    // Single selection for filters
+    const buttons = document.querySelectorAll('.filter-btn');
+    buttons.forEach(btn => {
+        const cat = btn.getAttribute('data-category');
+        if (cat === category) {
+            btn.className = 'filter-btn bg-gray-900 text-white px-5 py-2 rounded-lg text-sm font-medium transition-all';
         } else {
-            // Add filter
-            activeFilters.push(category);
-            button.className = 'filter-btn bg-gray-900 text-white px-5 py-2 rounded-lg text-sm font-medium transition-all';
-            
-            // Deactivate All button
-            allButton.className = 'filter-btn text-gray-600 hover:text-gray-900 px-5 py-2 rounded-lg text-sm font-medium transition-all';
+            btn.className = 'filter-btn text-gray-600 hover:text-gray-900 px-5 py-2 rounded-lg text-sm font-medium transition-all';
         }
+    });
+    
+    if (category === 'All') {
+        activeFilters = [];
+    } else {
+        activeFilters = [category];
     }
     
     renderGallery();
