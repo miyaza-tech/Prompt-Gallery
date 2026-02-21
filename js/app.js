@@ -508,6 +508,14 @@ function handleEditFileUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
     
+    // Validate file type (images only)
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'];
+    if (!validTypes.includes(file.type.toLowerCase())) {
+        showError('editFileError', 'Only image files are allowed (JPG, PNG, GIF, WebP, SVG)');
+        event.target.value = '';
+        return;
+    }
+    
     if (file.size > 10 * 1024 * 1024) {
         showError('editFileError', 'File size must be less than 10MB');
         event.target.value = '';
@@ -683,6 +691,14 @@ async function deleteImageFromStorage(imageUrl) {
 function handleFileUpload(event) {
     const file = event.target.files[0];
     if (!file) return;
+    
+    // Validate file type (images only)
+    const validTypes = ['image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml'];
+    if (!validTypes.includes(file.type.toLowerCase())) {
+        showError('fileError', 'Only image files are allowed (JPG, PNG, GIF, WebP, SVG)');
+        event.target.value = '';
+        return;
+    }
     
     // Validate file size (10MB limit for Storage)
     if (file.size > 10 * 1024 * 1024) {
@@ -990,7 +1006,7 @@ function toggleLoginModal() {
         // Clear form
         const emailEl = document.getElementById('loginEmail');
         const passwordEl = document.getElementById('loginPassword');
-        if (emailEl) emailEl.value = 'miyaza@gmail.com'; // Reset to default
+        if (emailEl) emailEl.value = ''; // Cleared for security
         if (passwordEl) passwordEl.value = '';
         document.getElementById('loginError').classList.add('hidden');
     }
