@@ -724,6 +724,26 @@ function handleFileUpload(event) {
 // Filtering
 let activeFilters = [];
 
+function updateFilterCounts() {
+    const counts = {};
+    items.forEach(item => {
+        const categories = item.category ? item.category.split(', ') : [];
+        categories.forEach(cat => {
+            counts[cat] = (counts[cat] || 0) + 1;
+        });
+    });
+    
+    const buttons = document.querySelectorAll('.filter-btn');
+    buttons.forEach(btn => {
+        const cat = btn.getAttribute('data-category');
+        if (cat === 'All') {
+            btn.textContent = 'All (' + items.length + ')';
+        } else {
+            btn.textContent = cat + ' (' + (counts[cat] || 0) + ')';
+        }
+    });
+}
+
 function filterItems(category) {
     // Single selection for filters
     const buttons = document.querySelectorAll('.filter-btn');
@@ -773,6 +793,8 @@ function renderGallery() {
         });
     
     count.textContent = items.length;
+    
+    updateFilterCounts();
     
     // Empty state
     if (filteredItems.length === 0) {
