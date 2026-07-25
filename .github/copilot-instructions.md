@@ -1,21 +1,37 @@
 # Prompt Gallery - AI Coding Instructions
 
 ## Project Overview
-Vanilla JavaScript web app for collecting and managing AI image generation prompts with real-time cloud sync. Uses Supabase (PostgreSQL + Storage + Auth + Realtime) for backend, replacing legacy localStorage. Supports multi-category filtering, image uploads, and JSON backup/restore. **No build process - pure HTML/CSS/JS.**
+Vanilla JavaScript web app for collecting and managing AI image generation prompts with real-time cloud sync. Uses Firebase (Cloud Firestore + Storage + Auth) for backend. Supports multi-category filtering, image uploads, and JSON backup/restore. **No build process - pure HTML/CSS/JS.**
 
 ## Architecture & Data Flow
 
 ### Single-File App Structure
 ```
 ├── index.html          # Complete UI with 3 modals (add/edit/login/image-preview)
-├── js/app.js           # All logic (~1200 lines, no framework)
-├── js/supabase-config.js  # Backend client init
+├── js/app.js           # All logic (~1300 lines, no framework) - CLASSIC script
+├── js/firebase-config.js  # Firebase init - ES MODULE, publishes window.fb
 └── css/style.css       # Custom animations (modals, hover effects)
 ```
 
+### Script Loading Contract (important)
+`app.js` must stay a **classic script** because `index.html` wires buttons with
+inline `onclick=` handlers, which resolve against globals. The Firebase modular
+SDK is ESM-only, so `js/firebase-config.js` is loaded as `<script type="module">`
+and re-publishes what it imports on `window.fb`:
+
+```html
+<script src="js/app.js"></script>
+<script type="module" src="js/firebase-config.js"></script>
+```
+
+Module scripts are deferred, so `window.fb` always exists before
+`DOMContentLoaded` fires. **Never** add `type="module"` to `app.js` - every
+inline handler in `index.html` would break. To use a new SDK function, import it
+in `firebase-config.js` AND add it to the `window.fb` object.
+
 ### Global State (Top of app.js)
 ```javascript
-let items = [];              // Loaded from Supabase on auth
+let items = [];              // Loaded from Firestore on auth
 let currentUser = null;      // Auth state (null = read-only)
 let editingId = null;        // Tracks which item is being edited
 let selectedCategories = []; // Add form multi-select
@@ -24,52 +40,60 @@ let uploadType = 'url';      // 'url' or 'file'
 let activeFilters = [];      // Multi-category filter (OR logic)
 ```
 
-### Supabase Backend Architecture
-**Database Table**: `Prompt-Gallery`
-```sql
-CREATE TABLE "Prompt-Gallery" (
-  id BIGSERIAL PRIMARY KEY,
-  prompt TEXT NOT NULL,
-  category TEXT,           -- Comma-separated: "GPT, Photo"
-  sref TEXT,               -- Midjourney style reference
-  image TEXT,              -- Supabase Storage URL or external URL
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-```
+### Firebase Backend Architecture
+**Firestore collection**: `prompts` (name lives in `window.fb.COLLECTION`)
 
-**Row Level Security (RLS)**:
-- SELECT: Public (anyone can read, even unauthenticated)
-- INSERT/UPDATE/DELETE: Only `auth.uid() IS NOT NULL`
+| Field | Type | Notes |
+|---|---|---|
+| `prompt` | string | Required |
+| `category` | string | Comma-separated: `"GPT, Photo"` |
+| `sref` | string | Midjourney style reference |
+| `image` | string | Firebase Storage download URL or external URL |
+| `created_at` | timestamp | `serverTimestamp()` on create; sort key |
 
-**Storage Bucket**: `prompt-images` (Public)
-- 10MB per file limit
+**Document IDs are auto-generated STRINGS**, not integers. This matters:
+- `createItemCard()` must quote the id: `editItem(\'' + item.id + '\')`
+- Never do arithmetic or `parseInt()` on an id
+- `orderBy('created_at')` **silently omits documents missing that field** - always
+  write `created_at`, including on import
+
+**Security rules**: see [firestore.rules](../firestore.rules) and
+[storage.rules](../storage.rules) - read and write both require `request.auth != null`.
+
+**Storage folder**: `prompt-images/`
+- 10MB per file limit, image content types only
 - Auto-deletes when prompt deleted (`deleteImageFromStorage()`)
 - Unique filenames: `${Date.now()}-${Math.random()}.${ext}`
+- Requires the **Blaze plan** (billing account) as of 2026-02-03
 
-**Realtime**: `postgres_changes` subscription for cross-device sync
+**Realtime**: `onSnapshot()` listener for cross-device sync
 
 ### Critical Data Operation Pattern
 ```javascript
-// ❌ NEVER use saveItems() - deprecated, localStorage legacy
-// ✅ ALWAYS use direct Supabase calls followed by reload:
+// ✅ ALWAYS use window.fb helpers followed by reload:
+const { db, doc, collection, addDoc, updateDoc, deleteDoc, serverTimestamp, COLLECTION } = window.fb;
 
 // CREATE
-await supabase.from('Prompt-Gallery').insert([{ prompt, category, sref, image }]);
+await addDoc(collection(db, COLLECTION), { prompt, category, sref, image, created_at: serverTimestamp() });
 await loadItems();
 renderGallery();
 updateButtonVisibility();
 
 // UPDATE
-await supabase.from('Prompt-Gallery').update({ ... }).eq('id', editingId);
+await updateDoc(doc(db, COLLECTION, editingId), { prompt, category, sref, image });
 await loadItems();
 renderGallery();
 
 // DELETE
 await deleteImageFromStorage(item.image); // If image exists
-await supabase.from('Prompt-Gallery').delete().eq('id', id);
+await deleteDoc(doc(db, COLLECTION, id));
 await loadItems();
 renderGallery();
 ```
+
+`loadItems()` maps documents through `docToItem()`, which flattens the doc id in
+as `id` and converts the `created_at` Timestamp to an ISO string so JSON
+export/import round-trips cleanly.
 
 ## Development Workflows
 
@@ -83,25 +107,34 @@ python -m http.server 8000
 # Just double-click index.html
 ```
 
-### Authentication Flow (Supabase Auth)
-**Login mechanism**: Uses Supabase email/password authentication
+### Authentication Flow (Firebase Auth)
+**Login mechanism**: Firebase email/password authentication
 ```javascript
 // On page load
-await checkAuthStatus(); // Calls supabase.auth.getSession()
+await checkAuthStatus(); // Wraps onAuthStateChanged in a promise
 if (currentUser) {
     await loadItems();
     subscribeToRealtime();
 }
 
 // Login
-const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-currentUser = data.user;
+const credential = await window.fb.signInWithEmailAndPassword(window.fb.auth, email, password);
+currentUser = credential.user;
 updateUIForAuth(); // Shows/hides buttons
 
 // Logout
-await supabase.auth.signOut();
+unsubscribeFromRealtime();  // MUST come first
+await window.fb.signOut(window.fb.auth);
 currentUser = null;
 ```
+
+**Two ordering rules that are easy to get wrong**:
+1. Firebase restores a persisted session *asynchronously* - `auth.currentUser` is
+   null on the first tick. Never read it directly at startup; go through
+   `checkAuthStatus()`, which resolves on the first `onAuthStateChanged` callback
+   and then keeps listening so other tabs stay in sync.
+2. Detach the snapshot listener *before* `signOut()`. Otherwise it keeps firing
+   against rules that no longer permit the read and spams permission errors.
 
 **UI visibility rules**:
 - Unauthenticated: Login required message + login button
@@ -110,30 +143,37 @@ currentUser = null;
 
 ### Realtime Cross-Device Sync
 ```javascript
-supabase.channel('prompt-gallery-channel')
-    .on('postgres_changes', { event: '*', table: 'Prompt-Gallery' }, 
-        async (payload) => {
-            await loadItems();        // Fetch latest
-            renderGallery();         // Re-render cards
-            updateButtonVisibility(); // Update button states
-        })
-    .subscribe();
+realtimeUnsubscribe = window.fb.onSnapshot(
+    promptsQuery(),
+    (snapshot) => {
+        items = snapshot.docs.map(docToItem); // Snapshot already carries the data
+        renderGallery();
+        updateButtonVisibility();
+    },
+    (error) => console.error('Realtime listener error:', error)
+);
 ```
-**Triggers on**: Any INSERT/UPDATE/DELETE from any device/tab
+**Triggers on**: Any create/update/delete from any device/tab.
+Unlike the previous backend, the snapshot *contains* the new documents, so the
+callback does not re-fetch. Keep the returned unsubscribe function in
+`realtimeUnsubscribe` and call `unsubscribeFromRealtime()` before logout or
+before re-subscribing (otherwise listeners stack up across logins).
 
 ### Image Upload Workflow
-1. User selects file → `handleFileUpload(event)` validates (10MB limit)
+1. User selects file → `handleFileUpload(event)` validates (type + 10MB limit)
 2. Preview shown via `FileReader.readAsDataURL()`
 3. On submit → `uploadImageToStorage(file)`:
-   - Uploads to `prompt-images` bucket
-   - Returns public URL: `https://[project].supabase.co/storage/v1/object/public/prompt-images/[filename]`
-4. URL saved in database `image` column
+   - Uploads to the `prompt-images/` folder
+   - Returns a download URL: `https://firebasestorage.googleapis.com/v0/b/[bucket]/o/prompt-images%2F[filename]?alt=media&token=...`
+4. URL saved in the document's `image` field
 
-**Image deletion**:
+**Image deletion**: the storage path is URL-encoded inside the download URL, so
+parse the `/o/` segment rather than splitting on the folder name. Only delete
+files we host - items whose `image` is an arbitrary external URL must be left alone.
 ```javascript
-// Extract path from URL: "https://.../prompt-images/1234.jpg" → "1234.jpg"
-const filePath = imageUrl.split('/prompt-images/')[1].split('?')[0];
-await supabase.storage.from('prompt-images').remove([filePath]);
+if (!imageUrl.includes('firebasestorage.googleapis.com')) return;
+const filePath = decodeURIComponent(imageUrl.match(/\/o\/([^?]+)/)[1]);
+await deleteObject(storageRef(storage, filePath));
 ```
 
 ## Critical Conventions
@@ -226,7 +266,7 @@ const jsEscaped = item.prompt.replace(/'/g, "\\'").replace(/\n/g, '\\n');
 
 ### Adding New Features
 1. **New field in database**:
-   - Update Supabase table schema (SQL migration)
+   - Firestore is schemaless - just start writing the field (update `firestore.rules` if it needs validation)
    - Add input to BOTH `#addFormModal` and `#editFormModal`
    - Update `addItem()`, `updateItem()`, `createItemCard()`
    - Test JSON export/import compatibility
@@ -258,19 +298,27 @@ const jsEscaped = item.prompt.replace(/'/g, "\\'").replace(/\n/g, '\\n');
 
 ### External Dependencies (CDN)
 ```html
-<script src="https://unpkg.com/@supabase/supabase-js@2.39.0/dist/umd/supabase.js"></script>
 <script src="https://cdn.tailwindcss.com"></script>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap">
+<!-- Firebase SDK is imported inside js/firebase-config.js from https://www.gstatic.com/firebasejs/12.16.0/ -->
 ```
 **Browser APIs**: FileReader, Clipboard API, fetch (translate feature)
 
-### Supabase Configuration ([js/supabase-config.js](js/supabase-config.js))
+**CSP**: `index.html` ships a `Content-Security-Policy` meta tag. Adding a new
+Firebase service usually means adding its host to `connect-src`. Current allowances:
+`firestore.googleapis.com`, `firebasestorage.googleapis.com`,
+`identitytoolkit.googleapis.com`, `securetoken.googleapis.com`, plus
+`www.gstatic.com` in `script-src`.
+
+### Firebase Configuration ([js/firebase-config.js](../js/firebase-config.js))
 ```javascript
-const SUPABASE_URL = 'https://uhwnbjmfcakbkbxvhpgx.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbG...'; // Public key (safe for client-side)
-const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+const firebaseConfig = { apiKey: '...', projectId: '...', storageBucket: '...', /* ... */ };
+const COLLECTION = 'prompts';
+const IMAGE_FOLDER = 'prompt-images';
+// ...imports Firebase modular SDK, then publishes everything on window.fb
 ```
-**RLS protects writes** - uses Supabase Auth tokens. Authenticated users can write; unauthenticated users are read-only (SELECT allowed).
+`apiKey` is a public identifier, not a secret - **security rules** are what protect
+the data. Both read and write require an authenticated user.
 
 ### Translation Feature (Image Modal)
 Uses **Google Translate API** (free, no auth):
@@ -289,12 +337,12 @@ const translated = data[0].map(item => item[0]).join('');
 
 ### Orphaned Storage Images
 **Problem**: Deleting prompt without deleting image.
-**Solution**: Always call `deleteImageFromStorage()` before `supabase.delete()`:
+**Solution**: Always call `deleteImageFromStorage()` before `deleteDoc()`:
 ```javascript
 if (item.image && item.image.includes('prompt-images')) {
     await deleteImageFromStorage(item.image);
 }
-await supabase.from('Prompt-Gallery').delete().eq('id', id);
+await deleteDoc(doc(db, COLLECTION, id));
 ```
 
 ### Realtime Not Working
@@ -305,36 +353,49 @@ await supabase.from('Prompt-Gallery').delete().eq('id', id);
 **Problem**: Filtering by category A doesn't show items with "A, B".
 **Solution**: Correct - uses OR logic. Item with "GPT, Photo" shows when filtering GPT OR Photo.
 
-### Supabase RLS Blocks Writes
-**Problem**: Authenticated user can't insert/update.
-**Solution**: 
-- Verify `auth.uid() IS NOT NULL` policy exists in Supabase dashboard
-- **This app uses Supabase Auth** - ensure user is properly authenticated via `supabase.auth.signInWithPassword()`
-- Check browser console for authentication errors and verify `currentUser` is set after login
+### Security Rules Block Writes
+**Problem**: Authenticated user can't create/update.
+**Solution**:
+- Verify the rules in the Firebase Console match [firestore.rules](../firestore.rules)
+- Confirm the collection name in the rules matches `window.fb.COLLECTION`
+- Check browser console for auth errors and verify `currentUser` is set after login
+
+### Image Upload Fails With 402/403
+**Problem**: Storage requests are rejected outright.
+**Solution**: The project must be on the **Blaze plan** - Spark projects have no
+Storage bucket access at all. Check the plan before debugging rules.
+
+### Item Saved But Never Appears
+**Problem**: Write succeeds, gallery stays empty.
+**Solution**: `loadItems()` orders by `created_at`, and Firestore drops documents
+that lack the sort field. Ensure every write sets `created_at`.
 
 ### Image Preview Not Showing
 **Problem**: FileReader preview shows but card doesn't.
 **Solution**: 
 - Add: Preview uses `readAsDataURL()` (base64)
-- Card: Uses Supabase Storage URL (after upload)
+- Card: Uses Firebase Storage download URL (after upload)
 - Check `uploadImageToStorage()` returns valid URL
 
 ## Quick Reference
 
 ### Render Pipeline
 ```
-User action → Supabase mutation → await loadItems() → renderGallery() → updateButtonVisibility()
+User action → Firestore mutation → await loadItems() → renderGallery() → updateButtonVisibility()
 ```
 
 ### Key Functions
-- `loadItems()`: Fetches all from Supabase
+- `loadItems()`: One-shot fetch of all documents from Firestore
+- `docToItem(docSnap)`: Firestore doc → plain item (`id` + ISO `created_at`)
+- `promptsQuery()`: Shared ordered query used by both fetch and listener
 - `renderGallery()`: Regenerates all cards (respects activeFilters)
 - `createItemCard(item)`: Returns HTML string for one card
 - `updateButtonVisibility()`: Shows/hides auth-dependent buttons
 - `updateUIForAuth()`: Calls renderGallery + button visibility
 
 ### Debugging Tips
-- Check browser console for Supabase errors
+- Check browser console for Firebase errors
+- Confirm `window.fb` exists (missing = `js/firebase-config.js` failed to load)
 - Verify `currentUser` state (null = unauthenticated)
-- Test Supabase RLS policies in Supabase dashboard
-- Use `console.log('✅ Realtime subscription active')` to verify sync
+- Test security rules in the Firebase Console Rules Playground
+- Use `console.log('✅ Realtime listener active')` to verify sync

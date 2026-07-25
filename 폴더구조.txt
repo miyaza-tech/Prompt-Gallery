@@ -2,15 +2,16 @@ prompt-gallery/
 ├── css/
 │   └── style.css               ✅ 커스텀 스타일 (모달 애니메이션, 스크롤바)
 ├── js/
-│   ├── app.js                  ✅ 메인 로직 (~1000 lines)
-│   │                              - CRUD 작업 (Supabase Database)
-│   │                              - Supabase Storage 업로드/삭제
-│   │                              - 실시간 동기화 (Realtime)
+│   ├── app.js                  ✅ 메인 로직 (~1300 lines) - classic script
+│   │                              - CRUD 작업 (Cloud Firestore)
+│   │                              - Firebase Storage 업로드/삭제
+│   │                              - 실시간 동기화 (onSnapshot)
 │   │                              - 인증 시스템 (Auth)
 │   │                              - 다중 카테고리 & 필터링
 │   │                              - 모달 UI 관리
-│   └── supabase-config.js      ✅ Supabase 클라이언트 설정
-│                                  - Project URL & API Key
+│   └── firebase-config.js      ✅ Firebase 초기화 - ES module
+│                                  - firebaseConfig (콘솔에서 복사)
+│                                  - SDK를 import 후 window.fb 로 노출
 ├── data/
 │   └── (JSON 백업 파일 저장용, 선택사항)
 ├── assets/
@@ -19,7 +20,7 @@ prompt-gallery/
 │   └── copilot-instructions.md ✅ AI 코딩 가이드
 │                                  - 프로젝트 아키텍처 설명
 │                                  - Dual Form 패턴 (Add/Edit)
-│                                  - Supabase 통합 가이드
+│                                  - Firebase 통합 가이드
 ├── index.html                  ✅ 메인 HTML
 │                                  - Tailwind CSS (CDN)
 │                                  - Add/Edit 모달 폼
@@ -28,7 +29,7 @@ prompt-gallery/
 │                                  - 필터 바
 ├── README.md                   ✅ 프로젝트 문서
 │                                  - 기능 설명
-│                                  - Supabase 설정 가이드
+│                                  - Firebase 설정 가이드
 │                                  - 배포 방법
 ├── 지침.txt                    ✅ 사용 가이드
 ├── 추가된 기능들.txt
@@ -48,18 +49,21 @@ js/app.js - 메인 애플리케이션 로직
   [전역 상태]
   - items[], currentUser, selectedCategories[], activeFilters[]
   
-  [Supabase Database]
-  - loadItems(): SELECT 쿼리
-  - saveItemWithImage(): INSERT/UPDATE
-  - deleteItem(): DELETE + Storage 이미지 삭제
-  
-  [Supabase Storage]
+  [Cloud Firestore]
+  - loadItems(): getDocs 조회 (created_at 내림차순)
+  - docToItem(): 문서 → 아이템 변환 (id + ISO created_at)
+  - saveItemWithImage(): addDoc / updateDoc
+  - deleteItem(): deleteDoc + Storage 이미지 삭제
+  - importItemsToFirestore(): JSON 일괄 등록 (writeBatch, 400개 단위)
+
+  [Firebase Storage]
   - uploadImageToStorage(): 파일 업로드 (10MB)
-  - deleteImageFromStorage(): 이미지 삭제
-  
+  - deleteImageFromStorage(): 이미지 삭제 (직접 업로드한 파일만)
+
   [Realtime 동기화]
-  - subscribeToRealtime(): postgres_changes 구독
-  
+  - subscribeToRealtime(): onSnapshot 리스너 등록
+  - unsubscribeFromRealtime(): 로그아웃 전 반드시 호출
+
   [Authentication]
   - checkAuthStatus(): 로그인 상태 확인
   - login(), logout(): 인증 처리
@@ -71,60 +75,63 @@ js/app.js - 메인 애플리케이션 로직
   - filterItems(): 다중 필터링 (OR 조건)
   - renderGallery(), createItemCard(): 렌더링
 
-js/supabase-config.js - Supabase 설정
-  - SUPABASE_URL, SUPABASE_ANON_KEY
-  - supabase 클라이언트 초기화
+js/firebase-config.js - Firebase 설정 (ES module)
+  - firebaseConfig (apiKey, projectId, storageBucket ...)
+  - COLLECTION = 'prompts', IMAGE_FOLDER = 'prompt-images'
+  - Firebase SDK v12.16.0 을 gstatic CDN 에서 import
+  - window.fb 로 auth/db/storage 와 필요한 함수들 노출
 
 ========================================
-🗄️ Supabase 구조
+🗄️ Firebase 구조
 ========================================
 
-Database:
-  - Table: "Prompt-Gallery"
-    * id (bigserial)
-    * prompt (text)
-    * category (text) - 쉼표로 구분된 다중 카테고리
-    * sref (text)
-    * image (text) - Storage URL 또는 외부 URL
-    * created_at (timestamptz)
+Cloud Firestore:
+  - Collection: "prompts"
+    * (문서 ID) - Firestore 자동 생성 문자열
+    * prompt (string)
+    * category (string) - 쉼표로 구분된 다중 카테고리
+    * sref (string)
+    * image (string) - Storage 다운로드 URL 또는 외부 URL
+    * created_at (timestamp) - 정렬 기준, 없으면 목록에서 누락됨
 
 Storage:
-  - Bucket: "prompt-images" (Public)
-    * 이미지 파일 저장 (최대 10MB)
-    * 무료 플랜: 1GB (약 1,000개 이미지)
+  - Folder: "prompt-images/"
+    * 이미지 파일 저장 (최대 10MB, image/* 만 허용)
+    * 무료 사용량: 5GB (약 5,000개 이미지)
+    * ⚠️ Blaze(종량제) 요금제 필수 - 2026-02-03부터 결제 계정 연결 필요
 
 Authentication:
   - Email/Password 로그인
-  - 관리자 계정만 수동 생성
+  - 관리자 계정만 콘솔에서 수동 생성
 
 Realtime:
-  - postgres_changes 구독
-  - INSERT/UPDATE/DELETE 이벤트 실시간 감지
+  - onSnapshot() 리스너
+  - 문서 추가/수정/삭제 실시간 감지
 
 ========================================
-🔒 보안 정책 (RLS)
+🔒 보안 규칙
 ========================================
 
-Database (Prompt-Gallery):
-  ✅ SELECT: 누구나 가능
-  🔒 INSERT/UPDATE/DELETE: auth.uid() IS NOT NULL
+Firestore (prompts) - firestore.rules:
+  🔒 read/write: request.auth != null
 
-Storage (prompt-images):
-  ✅ SELECT: 누구나 가능
-  🔒 INSERT/DELETE: auth.uid() IS NOT NULL
+Storage (prompt-images/) - storage.rules:
+  ✅ read: 누구나 가능 (img 태그용)
+  🔒 write: request.auth != null + 10MB 미만 + image/* 만
+  🔒 delete: request.auth != null
 
 ========================================
 🚀 배포 구조
 ========================================
 
 GitHub Repository: Prompt-Gallery
-  - main 브랜치: 소스 코드
-  - gh-pages 브랜치: 배포용
+  - main 브랜치: 소스 코드 + 배포 대상
 
 GitHub Pages:
   - https://miyaza-tech.github.io/Prompt-Gallery/
-  - gh-pages 브랜치 자동 배포
+  - .github/workflows/deploy.yml 이 main push 시 자동 배포
+  - 저장소 Settings > Pages > Source = "GitHub Actions" 필요
 
-Supabase Project:
-  - Database: uhwnbjmfcakbkbxvhpgx.supabase.co
-  - 무료 플랜: 500MB DB + 1GB Storage
+Firebase Project:
+  - Firestore + Storage + Authentication
+  - 설정값은 js/firebase-config.js 의 firebaseConfig 에 입력

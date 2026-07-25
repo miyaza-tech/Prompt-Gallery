@@ -7,8 +7,21 @@ let selectedCategories = []; // Multiple selection for forms
 let selectedEditCategories = []; // Multiple selection for forms
 let currentUser = null;
 
-// Initialize on page load
+// Initialize on page load.
+// js/firebase-config.js is a module script, so it has already run by the time
+// DOMContentLoaded fires - unless it failed to load.
 document.addEventListener('DOMContentLoaded', async function() {
+    if (!window.fb) {
+        console.error('❌ Firebase failed to initialize - check js/firebase-config.js');
+        alert('Failed to connect to Firebase. Please check the configuration.');
+        return;
+    }
+
+    // Paint the logged-out view first. Resolving the persisted session needs the
+    // network, so without this the page would sit blank until Firebase answers.
+    renderGallery();
+    updateButtonVisibility();
+
     await checkAuthStatus();
     if (currentUser) {
         await loadItems();
@@ -18,28 +31,37 @@ document.addEventListener('DOMContentLoaded', async function() {
     updateButtonVisibility();
 });
 
-// Supabase Database persistence
+// Firestore persistence
+
+// Turn a Firestore document into the plain item shape the UI expects.
+// created_at is normalized to an ISO string so export/import round-trips
+// cleanly instead of emitting a serialized Timestamp object.
+function docToItem(docSnap) {
+    const data = docSnap.data() || {};
+    const createdAt = data.created_at;
+    return {
+        ...data,
+        id: docSnap.id,
+        created_at: createdAt && typeof createdAt.toDate === 'function'
+            ? createdAt.toDate().toISOString()
+            : (createdAt || null)
+    };
+}
+
+function promptsQuery() {
+    const { db, collection, query, orderBy, COLLECTION } = window.fb;
+    return query(collection(db, COLLECTION), orderBy('created_at', 'desc'));
+}
+
 async function loadItems() {
     try {
-        const { data, error } = await supabase
-            .from('Prompt-Gallery')
-            .select('*')
-            .order('created_at', { ascending: false });
-        
-        if (error) throw error;
-        
-        items = data || [];
-        console.log(`Loaded ${items.length} items from Supabase`);
+        const snapshot = await window.fb.getDocs(promptsQuery());
+        items = snapshot.docs.map(docToItem);
+        console.log(`Loaded ${items.length} items from Firestore`);
     } catch (error) {
         console.error('Error loading items:', error);
         items = [];
     }
-}
-
-// No longer needed - replaced with direct Supabase insert/update/delete
-function saveItems() {
-    // This function is kept for backward compatibility but no longer used
-    console.warn('saveItems() is deprecated - use direct Supabase operations');
 }
 
 // Form management
@@ -148,19 +170,19 @@ async function addItem() {
     
     const category = selectedCategories.join(', ');
     
-    // Handle file upload to Supabase Storage
+    // Handle file upload to Firebase Storage
     if (uploadType === 'file') {
         const fileEl = document.getElementById('imageFile');
         if (fileEl && fileEl.files[0]) {
             const file = fileEl.files[0];
-            
+
             // Validate file size (increased to 10MB for Storage)
             if (file.size > 10 * 1024 * 1024) {
                 showError('fileError', 'File size must be less than 10MB');
                 return;
             }
-            
-            // Upload to Supabase Storage
+
+            // Upload to Firebase Storage
             const imageUrl = await uploadImageToStorage(file);
             if (imageUrl) {
                 await saveItemWithImage(prompt, category, sref, imageUrl);
@@ -183,37 +205,31 @@ async function addItem() {
 
 async function saveItemWithImage(prompt, category, sref, image) {
     try {
+        const { db, doc, updateDoc, addDoc, collection, serverTimestamp, COLLECTION } = window.fb;
+
         if (editingId) {
-            // Update existing item in Supabase
-            const { error } = await supabase
-                .from('Prompt-Gallery')
-                .update({
-                    prompt: prompt,
-                    category: category,
-                    sref: sref,
-                    image: image
-                })
-                .eq('id', editingId);
-            
-            if (error) throw error;
-            console.log('Item updated in Supabase');
+            // Update existing item in Firestore
+            await updateDoc(doc(db, COLLECTION, editingId), {
+                prompt: prompt,
+                category: category,
+                sref: sref,
+                image: image
+            });
+            console.log('Item updated in Firestore');
             editingId = null;
         } else {
-            // Create new item in Supabase
-            const { error } = await supabase
-                .from('Prompt-Gallery')
-                .insert([{
-                    prompt: prompt,
-                    category: category,
-                    sref: sref,
-                    image: image
-                }]);
-            
-            if (error) throw error;
-            console.log('New item added to Supabase');
+            // Create new item in Firestore
+            await addDoc(collection(db, COLLECTION), {
+                prompt: prompt,
+                category: category,
+                sref: sref,
+                image: image,
+                created_at: serverTimestamp()
+            });
+            console.log('New item added to Firestore');
         }
-        
-        // Reload items from Supabase
+
+        // Reload items from Firestore
         await loadItems();
         renderGallery();
         toggleForm();
@@ -362,7 +378,7 @@ async function updateItem() {
     
     const category = selectedEditCategories.join(', ');
     
-    // Handle file upload to Supabase Storage
+    // Handle file upload to Firebase Storage
     if (uploadType === 'file') {
         const fileEl = document.getElementById('editImageFile');
         if (fileEl && fileEl.files[0]) {
@@ -408,22 +424,19 @@ async function updateItem() {
 
 async function saveUpdatedItem(prompt, category, sref, image) {
     try {
-        const { error } = await supabase
-            .from('Prompt-Gallery')
-            .update({
-                prompt: prompt,
-                category: category,
-                sref: sref,
-                image: image
-            })
-            .eq('id', editingId);
-        
-        if (error) throw error;
-        
-        console.log('Item updated in Supabase');
+        const { db, doc, updateDoc, COLLECTION } = window.fb;
+
+        await updateDoc(doc(db, COLLECTION, editingId), {
+            prompt: prompt,
+            category: category,
+            sref: sref,
+            image: image
+        });
+
+        console.log('Item updated in Firestore');
         editingId = null;
-        
-        // Reload items from Supabase
+
+        // Reload items from Firestore
         await loadItems();
         renderGallery();
         closeEditForm();
@@ -446,17 +459,13 @@ async function deleteCurrentItem() {
             }
             
             // Delete item from database
-            const { error } = await supabase
-                .from('Prompt-Gallery')
-                .delete()
-                .eq('id', editingId);
-            
-            if (error) throw error;
-            
-            console.log('Item deleted from Supabase');
+            const { db, doc, deleteDoc, COLLECTION } = window.fb;
+            await deleteDoc(doc(db, COLLECTION, editingId));
+
+            console.log('Item deleted from Firestore');
             editingId = null;
-            
-            // Reload items from Supabase
+
+            // Reload items from Firestore
             await loadItems();
             renderGallery();
             closeEditForm();
@@ -545,16 +554,12 @@ async function deleteItem(id) {
             }
             
             // Delete item from database
-            const { error } = await supabase
-                .from('Prompt-Gallery')
-                .delete()
-                .eq('id', id);
-            
-            if (error) throw error;
-            
-            console.log('Item deleted from Supabase');
-            
-            // Reload items from Supabase
+            const { db, doc, deleteDoc, COLLECTION } = window.fb;
+            await deleteDoc(doc(db, COLLECTION, id));
+
+            console.log('Item deleted from Firestore');
+
+            // Reload items from Firestore
             await loadItems();
             renderGallery();
             updateButtonVisibility();
@@ -633,34 +638,29 @@ function setUploadType(type) {
     }
 }
 
-// Supabase Storage upload function
+// Firebase Storage upload function
 async function uploadImageToStorage(file) {
     try {
+        const { storage, storageRef, uploadBytes, getDownloadURL, IMAGE_FOLDER } = window.fb;
+
         // Generate unique filename
         const fileExt = file.name.split('.').pop();
         const fileName = `${Date.now()}-${Math.random().toString(36).substring(2)}.${fileExt}`;
-        const filePath = `${fileName}`;
-        
+        const filePath = `${IMAGE_FOLDER}/${fileName}`;
+
         console.log('Uploading image to Storage:', filePath);
-        
-        // Upload to Supabase Storage
-        const { data, error } = await supabase.storage
-            .from('prompt-images')
-            .upload(filePath, file, {
-                cacheControl: '3600',
-                upsert: false
-            });
-        
-        if (error) throw error;
-        
-        // Get public URL
-        const { data: { publicUrl } } = supabase.storage
-            .from('prompt-images')
-            .getPublicUrl(filePath);
-        
-        console.log('Image uploaded successfully:', publicUrl);
-        return publicUrl;
-        
+
+        const fileRef = storageRef(storage, filePath);
+        await uploadBytes(fileRef, file, {
+            contentType: file.type,
+            cacheControl: 'public, max-age=3600'
+        });
+
+        const downloadUrl = await getDownloadURL(fileRef);
+
+        console.log('Image uploaded successfully:', downloadUrl);
+        return downloadUrl;
+
     } catch (error) {
         console.error('Error uploading image:', error);
         alert('Failed to upload image: ' + error.message);
@@ -668,20 +668,25 @@ async function uploadImageToStorage(file) {
     }
 }
 
-// Delete image from Storage
+// Delete image from Storage.
+// Only touches files we actually host - images added as plain URLs (including
+// ones still served from the old Supabase bucket) are left alone.
 async function deleteImageFromStorage(imageUrl) {
     try {
-        // Extract file path from URL
-        const urlParts = imageUrl.split('/prompt-images/');
-        if (urlParts.length < 2) return; // Not a Storage URL
-        
-        const filePath = urlParts[1].split('?')[0]; // Remove query params
-        
-        const { error } = await supabase.storage
-            .from('prompt-images')
-            .remove([filePath]);
-        
-        if (error) throw error;
+        if (!imageUrl || !imageUrl.includes('firebasestorage.googleapis.com')) {
+            console.log('Not a Firebase Storage URL, skipping delete:', imageUrl);
+            return;
+        }
+
+        // Download URLs look like .../o/prompt-images%2Ffile.jpg?alt=media&token=...
+        const match = imageUrl.match(/\/o\/([^?]+)/);
+        if (!match) return;
+
+        const filePath = decodeURIComponent(match[1]);
+
+        const { storage, storageRef, deleteObject } = window.fb;
+        await deleteObject(storageRef(storage, filePath));
+
         console.log('Image deleted from Storage:', filePath);
     } catch (error) {
         console.error('Error deleting image:', error);
@@ -858,7 +863,7 @@ function createItemCard(item) {
         '<button onclick=\"copyPrompt(\'' + jsEscapedPrompt + '\')\" ' +
         'class=\"bg-gray-900 text-white px-3 py-2 rounded-lg text-sm font-medium opacity-0 group-hover:opacity-100 transition-all transform translate-y-2 group-hover:translate-y-0 hover:bg-gray-800 pointer-events-auto\">' +
         'prompt</button>' +
-        (currentUser ? '<button onclick=\"editItem(' + item.id + ')\" ' +
+        (currentUser ? '<button onclick=\"editItem(\'' + item.id + '\')\" ' +
         'class=\"bg-gray-900 text-white px-3 py-2 rounded-lg text-sm font-medium opacity-0 group-hover:opacity-100 transition-all transform translate-y-2 group-hover:translate-y-0 hover:bg-gray-800 pointer-events-auto\">' +
         'edit</button>' : '') +
         '</div>' +
@@ -897,29 +902,86 @@ function importData() {
 function handleImport(event) {
     const file = event.target.files[0];
     if (!file) return;
-    
+
     const reader = new FileReader();
-    reader.onload = function(e) {
+    reader.onload = async function(e) {
         try {
             const imported = JSON.parse(e.target.result);
-            if (Array.isArray(imported)) {
-                items = imported;
-                saveItems();
-                renderGallery();
-                updateButtonVisibility();
-                alert('Data imported successfully! (' + items.length + ' items)');
-            } else {
+
+            if (!Array.isArray(imported)) {
                 alert('Invalid file format');
+                return;
             }
+
+            await importItemsToFirestore(imported);
         } catch (error) {
             console.error('Import failed:', error);
             alert('Error importing file: ' + error.message);
         }
     };
     reader.readAsText(file);
-    
+
     // Reset file input
     event.target.value = '';
+}
+
+// Write imported records into Firestore. Records are appended - existing items
+// are left untouched - and each one gets a fresh Firestore document ID, so any
+// `id` carried over from another backend is dropped.
+async function importItemsToFirestore(imported) {
+    if (!currentUser) {
+        alert('Please log in before importing.');
+        return;
+    }
+
+    const records = imported.filter(record => record && record.prompt);
+    const skipped = imported.length - records.length;
+
+    if (records.length === 0) {
+        alert('No importable items found (each item needs a "prompt" field).');
+        return;
+    }
+
+    const message = 'Add ' + records.length + ' item(s) to the gallery?'
+        + (skipped > 0 ? '\n(' + skipped + ' entr(y/ies) without a prompt will be skipped.)' : '');
+    if (!confirm(message)) return;
+
+    const { db, doc, collection, writeBatch, serverTimestamp, Timestamp, COLLECTION } = window.fb;
+
+    // Firestore caps a batch at 500 writes
+    const BATCH_SIZE = 400;
+
+    try {
+        for (let start = 0; start < records.length; start += BATCH_SIZE) {
+            const batch = writeBatch(db);
+
+            records.slice(start, start + BATCH_SIZE).forEach(record => {
+                const parsedDate = record.created_at ? new Date(record.created_at) : null;
+                const createdAt = parsedDate && !isNaN(parsedDate.getTime())
+                    ? Timestamp.fromDate(parsedDate)
+                    : serverTimestamp();
+
+                batch.set(doc(collection(db, COLLECTION)), {
+                    prompt: record.prompt,
+                    category: record.category || '',
+                    sref: record.sref || '',
+                    image: record.image || '',
+                    created_at: createdAt
+                });
+            });
+
+            await batch.commit();
+            console.log('Imported ' + Math.min(start + BATCH_SIZE, records.length) + '/' + records.length);
+        }
+
+        await loadItems();
+        renderGallery();
+        updateButtonVisibility();
+        alert('Data imported successfully! (' + records.length + ' items)');
+    } catch (error) {
+        console.error('Import failed:', error);
+        alert('Import failed: ' + error.message);
+    }
 }
 
 // Button visibility management
@@ -938,56 +1000,108 @@ function updateButtonVisibility() {
     }
 }
 
-// Supabase Realtime subscription for cross-device sync
+// Firestore realtime listener for cross-device sync
+let realtimeUnsubscribe = null;
+
 function subscribeToRealtime() {
-    supabase
-        .channel('prompt-gallery-channel')
-        .on(
-            'postgres_changes',
-            {
-                event: '*', // Listen to all events (INSERT, UPDATE, DELETE)
-                schema: 'public',
-                table: 'Prompt-Gallery'
-            },
-            async (payload) => {
-                console.log('Realtime update received:', payload);
-                
-                // Reload data from Supabase when any change occurs
-                await loadItems();
-                renderGallery();
-                updateButtonVisibility();
-            }
-        )
-        .subscribe((status) => {
-            if (status === 'SUBSCRIBED') {
-                console.log('✅ Realtime subscription active - syncing across devices');
-            } else if (status === 'CHANNEL_ERROR') {
-                console.error('❌ Realtime subscription error');
-            }
-        });
+    // Avoid stacking listeners when login happens more than once per page load
+    unsubscribeFromRealtime();
+
+    realtimeUnsubscribe = window.fb.onSnapshot(
+        promptsQuery(),
+        (snapshot) => {
+            items = snapshot.docs.map(docToItem);
+            console.log(`Realtime update received: ${items.length} items`);
+            renderGallery();
+            updateButtonVisibility();
+        },
+        (error) => {
+            console.error('❌ Realtime listener error:', error);
+        }
+    );
+
+    console.log('✅ Realtime listener active - syncing across devices');
+}
+
+// Detach before logout, otherwise the listener keeps firing against rules that
+// no longer allow the read and floods the console with permission errors.
+function unsubscribeFromRealtime() {
+    if (realtimeUnsubscribe) {
+        realtimeUnsubscribe();
+        realtimeUnsubscribe = null;
+    }
 }
 
 // Authentication functions
-async function checkAuthStatus() {
-    try {
-        // Check Supabase Auth session
-        const { data: { session }, error } = await supabase.auth.getSession();
-        
-        if (error) throw error;
-        
-        currentUser = session ? session.user : null;
-        updateUIForAuth();
-        
-        if (currentUser) {
-            console.log('✅ Logged in:', currentUser.email);
-        } else {
-            console.log('ℹ️ Not logged in - read-only mode');
-        }
-    } catch (error) {
-        console.error('Error checking auth status:', error);
-        currentUser = null;
-        updateUIForAuth();
-    }
+
+// Firebase restores a persisted session asynchronously, so auth.currentUser is
+// still null on the first tick. Resolve once the SDK reports the initial state,
+// then keep listening so other tabs signing in/out update this one too.
+//
+// A misconfigured project can leave the SDK never reporting an initial state at
+// all, so fall back to "logged out" rather than blocking startup forever.
+const AUTH_INIT_TIMEOUT_MS = 8000;
+
+function checkAuthStatus() {
+    return new Promise((resolve) => {
+        let settled = false;
+
+        const timeout = setTimeout(() => {
+            if (settled) return;
+            settled = true;
+            console.warn('⚠️ Firebase Auth did not report an initial state within '
+                + AUTH_INIT_TIMEOUT_MS + 'ms - continuing as logged out. '
+                + 'Check firebaseConfig and that the domain is authorized.');
+            currentUser = null;
+            updateUIForAuth();
+            resolve(null);
+        }, AUTH_INIT_TIMEOUT_MS);
+
+        window.fb.onAuthStateChanged(
+            window.fb.auth,
+            async (user) => {
+                currentUser = user;
+                updateUIForAuth();
+
+                if (currentUser) {
+                    console.log('✅ Logged in:', currentUser.email);
+                } else {
+                    console.log('ℹ️ Not logged in - read-only mode');
+                }
+
+                if (!settled) {
+                    // Initial state - the page load path wires up data itself
+                    settled = true;
+                    clearTimeout(timeout);
+                    resolve(user);
+                    return;
+                }
+
+                // A later change, i.e. another tab signed in or out. Bring this
+                // tab's data in line instead of leaving a stale/empty gallery.
+                if (currentUser) {
+                    await loadItems();
+                    subscribeToRealtime();
+                } else {
+                    unsubscribeFromRealtime();
+                    items = [];
+                }
+                renderGallery();
+                updateButtonVisibility();
+            },
+            (error) => {
+                console.error('Error checking auth status:', error);
+                currentUser = null;
+                updateUIForAuth();
+
+                if (!settled) {
+                    settled = true;
+                    clearTimeout(timeout);
+                    resolve(null);
+                }
+            }
+        );
+    });
 }
 
 function updateUIForAuth() {
@@ -1052,23 +1166,20 @@ async function login() {
     }
     
     try {
-        // Supabase Auth로 로그인
-        const { data, error } = await supabase.auth.signInWithPassword({
-            email: email,
-            password: password
-        });
-        
-        if (error) throw error;
-        
-        currentUser = data.user;
+        // Firebase Auth로 로그인
+        const credential = await window.fb.signInWithEmailAndPassword(
+            window.fb.auth,
+            email,
+            password
+        );
+
+        currentUser = credential.user;
         console.log('✅ Login successful:', currentUser.email);
-        
+
         toggleLoginModal();
-        
-        // 로그인 후 데이터 로드 및 실시간 동기화 시작
-        await loadItems();
-        subscribeToRealtime();
-        
+
+        // 데이터 로드와 실시간 구독은 checkAuthStatus()가 등록해 둔
+        // onAuthStateChanged 리스너가 처리합니다 (여기서 또 부르면 중복 실행)
         updateUIForAuth();
         alert('Login successful!');
     } catch (error) {
@@ -1081,10 +1192,13 @@ async function login() {
 async function logout() {
     if (confirm('Logout?')) {
         try {
-            const { error } = await supabase.auth.signOut();
-            if (error) throw error;
-            
+            // Stop listening before the credentials go away
+            unsubscribeFromRealtime();
+
+            await window.fb.signOut(window.fb.auth);
+
             currentUser = null;
+            items = [];
             console.log('✅ Logged out');
             updateUIForAuth();
             alert('Logged out successfully');

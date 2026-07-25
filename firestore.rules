@@ -1,0 +1,15 @@
+rules_version = '2';
+
+// Prompt Gallery - Firestore rules
+// Paste into Firebase Console > Firestore Database > Rules.
+//
+// The gallery is private: only signed-in users can read or write. Accounts are
+// created manually in Firebase Console > Authentication > Users (there is no
+// public sign-up flow in the app).
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /prompts/{promptId} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}
