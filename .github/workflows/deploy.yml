@@ -21,8 +21,10 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      # enablement lets the workflow turn Pages on itself. Without it this step
-      # fails outright whenever the repo has no Pages site configured.
+      # Asks the workflow to create the Pages site if it is missing. Note this
+      # does NOT always work: GITHUB_TOKEN often lacks the rights to enable
+      # Pages, in which case this step fails and Pages must be switched on once
+      # under Settings > Pages > Source: GitHub Actions.
       - uses: actions/configure-pages@v5
         with:
           enablement: true
